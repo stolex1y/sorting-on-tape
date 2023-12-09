@@ -14,3 +14,5 @@ include(Ccache)
 
 add_subdirectory(src bin)
 add_subdirectory(test)
+
+include(Install)

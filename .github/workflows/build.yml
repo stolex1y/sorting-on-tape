@@ -96,7 +96,6 @@ jobs:
         run: |
           cd $BUILD_DIR
           cmake --build . -t doxygen
-          mv doxygen docs
           tar -czf docs.tar.gz docs
 
       - name: Make build archive

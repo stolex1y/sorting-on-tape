@@ -9,25 +9,48 @@
 
 namespace sot::test {
 
+using namespace std::chrono;
+using namespace std::chrono_literals;
 using namespace files;
 
 class FileTapeTest : public testing::Test {
  public:
-  FileTapeTest();
-
   FakeConfiguration config_;
   std::string test_name_ = testing::UnitTest::GetInstance()->current_test_info()->name();
   std::string file_prefix_ = "FileTapeTest/" + test_name_ + "/";
+
+  FileTapeTest();
+
+  /**
+   * \brief Установить нулевое значение всех задержек.
+   */
+  void SetZeroDurations();
 };
 
 FileTapeTest::FileTapeTest() {
   CreateDir(file_prefix_);
+  SetZeroDurations();
 }
 
 template <bool Mutable>
 std::string ReadAll(FileTape<char, Mutable> &tape) {
   const auto chars = tape.ReadN(std::string::npos);
   return {chars.begin(), chars.end()};
+}
+
+void FileTapeTest::SetZeroDurations() {
+  config_.SetWriteDuration(0ms);
+  config_.SetReadDuration(0ms);
+  config_.SetRewindDuration(0ms);
+  config_.SetMoveDuration(0ms);
+}
+
+template <typename MeasureDuration>
+MeasureDuration Measure(const std::function<void()> &fun) {
+  const auto start = steady_clock::now();
+  fun();
+  const auto end = steady_clock::now();
+  return floor<MeasureDuration>(end - start);
 }
 
 TEST_F(FileTapeTest, ReadFromMutableFileTape) {
@@ -227,6 +250,106 @@ TEST_F(FileTapeTest, WriteInt) {
 
   EXPECT_EQ(written_numbers.size(), written);
   EXPECT_EQ(written_numbers, actual_numbers);
+}
+
+TEST_F(FileTapeTest, ReadDelay) {
+  const auto file_name = file_prefix_ + "file";
+  const std::string content = "aa";
+  CreateFileWithContent(file_name, content);
+  constexpr auto read_duration = 500ms;
+  const auto expected_duration = content.size() * read_duration;
+
+  config_.SetReadDuration(read_duration);
+  FileTape<char, false> under_test(config_, file_name);
+
+  const auto actual_duration = Measure<seconds>([&under_test] {
+    ReadAll(under_test);
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
+}
+
+TEST_F(FileTapeTest, ForwardMoveDelay) {
+  const auto file_name = file_prefix_ + "file";
+  const std::string content = "aa";
+  CreateFileWithContent(file_name, content);
+  constexpr auto move_duration = 500ms;
+  const auto expected_duration = content.size() * move_duration;
+
+  config_.SetMoveDuration(move_duration);
+  FileTape<char, false> under_test(config_, file_name);
+
+  const auto actual_duration = Measure<seconds>([&under_test] {
+    while (under_test.MoveForward()) {
+    }
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
+}
+
+TEST_F(FileTapeTest, BackwardMoveDelay) {
+  const auto file_name = file_prefix_ + "file";
+  const std::string content = "aa";
+  CreateFileWithContent(file_name, content);
+  constexpr auto move_duration = 500ms;
+  const auto expected_duration = content.size() * move_duration;
+
+  config_.SetMoveDuration(move_duration);
+  FileTape<char, false> under_test(config_, file_name);
+
+  under_test.MoveToEnd();
+  const auto actual_duration = Measure<seconds>([&under_test] {
+    while (under_test.MoveBackward()) {
+    }
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
+}
+
+TEST_F(FileTapeTest, WriteDelay) {
+  const auto file_name = file_prefix_ + "file";
+  const std::string content = "aa";
+  constexpr auto write_duration = 500ms;
+  const auto expected_duration = content.size() * write_duration;
+
+  config_.SetWriteDuration(write_duration);
+  FileTape<char> under_test(config_, file_name);
+
+  const auto actual_duration = Measure<seconds>([&content, &under_test] {
+    under_test.WriteN({content.begin(), content.end()});
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
+}
+
+TEST_F(FileTapeTest, MoveToBeginDelay) {
+  const auto file_name = file_prefix_ + "file";
+  constexpr auto rewind_duration = 1s;
+  const auto expected_duration = rewind_duration;
+
+  config_.SetRewindDuration(rewind_duration);
+  FileTape<char> under_test(config_, file_name);
+
+  const auto actual_duration = Measure<seconds>([&under_test] {
+    under_test.MoveToBegin();
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
+}
+
+TEST_F(FileTapeTest, MoveToEndDuration) {
+  const auto file_name = file_prefix_ + "file";
+  constexpr auto rewind_duration = 1s;
+  const auto expected_duration = rewind_duration;
+
+  config_.SetRewindDuration(rewind_duration);
+  FileTape<char> under_test(config_, file_name);
+
+  const auto actual_duration = Measure<seconds>([&under_test] {
+    under_test.MoveToEnd();
+  });
+
+  EXPECT_EQ(expected_duration, actual_duration);
 }
 
 }  // namespace sot::test

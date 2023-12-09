@@ -97,6 +97,21 @@ TEST_F(FileTapeTest, MoveToEnd) {
   EXPECT_EQ(std::nullopt, under_test.Read()) << "The cursor is not at the end";
 }
 
+TEST_F(FileTapeTest, MoveForwardToReadPartOfContent) {
+  const auto file_name = file_prefix_ + "file";
+  const std::string content = "Test content";
+  constexpr auto skip = 5;
+  CreateFileWithContent(file_name, content);
+  FileTape<char> under_test(config_, file_name);
+
+  for (size_t i = 0; i < skip; ++i) {
+    under_test.MoveForward();
+  }
+  const auto actual_content = ReadAll(under_test);
+
+  EXPECT_EQ(content.substr(skip), actual_content) << "Content from the file tape is different";
+}
+
 TEST_F(FileTapeTest, MoveBackwardFromBegin) {
   const auto file_name = file_prefix_ + "file";
   const std::string content = "Test content";

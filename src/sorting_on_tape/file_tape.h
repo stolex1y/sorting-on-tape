@@ -5,22 +5,24 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 
 #include "configuration.h"
 #include "tape.h"
 
 namespace sot {
+
 /**
  * \brief Эмулятор устройства типа ленты на основе файла.
  *
  * \tparam Value тип данных для хранения на устройстве.
  * \tparam Mutable можно ли изменять данные в файле.
  */
-template <typename Value, bool Mutable = true>
+template <typename Value = int32_t, bool Mutable = true>
 class FileTape : public Tape<Value> {
  public:
   /// Единицы измерения "задержек" устройства.
-  typedef std::chrono::milliseconds Duration;
+  using Duration = std::chrono::milliseconds;
 
   /// Ключ в конфигурации,
   /// задающий задержку чтения с устройства в @link Duration заданных единицах@endlink.
@@ -98,6 +100,7 @@ std::optional<Value> FileTape<Value, Mutable>::Read() {
     fstream_.seekg(before);
     return std::nullopt;
   }
+  std::this_thread::sleep_for(read_duration_ + move_duration_);
   return value;
 }
 
@@ -123,6 +126,7 @@ bool FileTape<Value, Mutable>::Write(const Value &value) {
     fstream_.seekg(before);
     return false;
   }
+  std::this_thread::sleep_for(write_duration_ + move_duration_);
   return true;
 }
 
@@ -153,6 +157,7 @@ bool FileTape<Value, Mutable>::MoveForward() {
     fstream_.seekg(before);
     return false;
   }
+  std::this_thread::sleep_for(move_duration_);
   return true;
 }
 
@@ -165,16 +170,19 @@ bool FileTape<Value, Mutable>::MoveBackward() {
     fstream_.seekg(before);
     return false;
   }
+  std::this_thread::sleep_for(move_duration_);
   return true;
 }
 
 template <typename Value, bool Mutable>
 void FileTape<Value, Mutable>::MoveToBegin() {
+  std::this_thread::sleep_for(rewind_duration_);
   fstream_.seekg(0);
 }
 
 template <typename Value, bool Mutable>
 void FileTape<Value, Mutable>::MoveToEnd() {
+  std::this_thread::sleep_for(rewind_duration_);
   fstream_.seekg(0, std::ios_base::end);
 }
 

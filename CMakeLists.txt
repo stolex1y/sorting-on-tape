@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.27)
-project("sorting-on-tape" VERSION 1.0.0 LANGUAGES CXX)
+file(STRINGS "version.txt" PROJECT_VERSION)
+project("sorting-on-tape" VERSION "${PROJECT_VERSION}" LANGUAGES CXX)
+message("Project version ${CMAKE_PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

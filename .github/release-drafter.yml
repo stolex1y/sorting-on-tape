@@ -1,0 +1,47 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+categories:
+  - title: ' New Features'
+    labels:
+      - 'major'
+      - 'minor'
+
+  - title: ' Bugs Fixes'
+    labels:
+      - 'fix'
+
+  - title: ' Documentation'
+    labels:
+      - 'documentation'
+
+  - title: ' Configuration | Workflows'
+    labels:
+      - 'config'
+      - 'workflows'
+
+  - title: ' Tests'
+    labels:
+      - 'tests'
+
+exclude-labels:
+  - 'skip-changelog'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+template: |
+  ## Changes
+  $CHANGES
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+  minor:
+    labels:
+      - 'minor'
+  patch:
+    labels:
+      - 'fix'
+      - 'documentation'
+      - 'config'
+      - 'tests'
+      - 'workflows'

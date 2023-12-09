@@ -1,0 +1,109 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      build_type:
+        description: "Build type: Debug, Release"
+        type: string
+        required: false
+        default: "Release"
+      build_dir:
+        description: "Build directory"
+        type: string
+        required: false
+        default: "build"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_DIR: ${{ inputs.build_dir }}
+  BUILD_TYPE: ${{ inputs.build_type }}
+  CCACHE_BASEDIR: $GITHUB_WORKSPACE
+  CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
+  CCACHE_COMPRESS: "true"
+  CCACHE_COMPRESSLEVEL: "6"
+  CCACHE_MAXSIZE: "400M"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Apt update
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt update
+
+      - name: Set up GCC
+        run: |
+          sudo apt install -y gcc-13 g++-13
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 20 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+
+      - name: Install static and dynamic checkers
+        run: |
+          sudo apt install -y clang-format
+          sudo apt install -y valgrind
+
+      - name: Install doxygen
+        run: |
+          sudo apt install -y doxygen graphviz
+
+      - name: Install ccache
+        run: sudo apt install -y ccache
+
+      - name: Prepare ccache timestamp
+        id: ccache_cache_timestamp
+        run: |
+          current_date=`date "+%Y-%m-%d-%H;%M;%S"`
+          echo "timestamp=${current_date}" >> $GITHUB_OUTPUT
+
+      - name: ccache cache files
+        uses: actions/cache@v3
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Zero the cache statistics
+        run: |
+          ccache -p
+          ccache -z
+
+      - name: Configure CMake
+        run: cmake -S . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+#          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build ./$BUILD_DIR -j 2
+
+      - name: ccache statistics
+        run: ccache -s
+
+      - name: Pack executable
+        run: |
+          cd $BUILD_DIR
+          cpack -G TGZ -B packages
+          mv packages/*.tar.gz .
+
+      - name: Make documentation
+        run: |
+          cd $BUILD_DIR
+          cmake --build . -t doxygen
+          mv doxygen docs
+          tar -czf docs.tar.gz docs
+
+      - name: Make build archive
+        run: tar -czf $BUILD_DIR.tar.gz $BUILD_DIR
+
+      - name: Upload build
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.build_dir }}
+          path: ${{ inputs.build_dir }}.tar.gz

@@ -27,6 +27,8 @@ class FileTape : public Tape<Value> {
   using Values = typename Tape<Value>::Values;
   /// Итератор вектора из элементов.
   using ValuesIterator = typename Tape<Value>::ValuesIterator;
+  /// Константный итератор вектора из элементов.
+  using ValuesConstIterator = typename Tape<Value>::ValuesConstIterator;
   /// Единицы измерения "задержек" устройства.
   using Duration = std::chrono::milliseconds;
 
@@ -62,7 +64,7 @@ class FileTape : public Tape<Value> {
   Values ReadN(size_t n) override;
   bool Write(const Value &value) override;
   size_t WriteN(const Values &values) override;
-  ValuesIterator WriteN(ValuesIterator begin, ValuesIterator end) override;
+  ValuesConstIterator WriteN(ValuesConstIterator begin, ValuesConstIterator end) override;
   bool MoveForward() override;
   bool MoveBackward() override;
   void MoveToBegin() override;
@@ -154,7 +156,7 @@ size_t FileTape<Value, Mutable>::WriteN(const Values &values) {
 }
 
 template <typename Value, bool Mutable>
-auto FileTape<Value, Mutable>::WriteN(ValuesIterator begin, ValuesIterator end) -> ValuesIterator {
+auto FileTape<Value, Mutable>::WriteN(ValuesConstIterator begin, ValuesConstIterator end) -> ValuesConstIterator {
   while (begin < end) {
     if (!Write(*begin)) {
       break;

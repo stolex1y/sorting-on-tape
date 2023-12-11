@@ -20,6 +20,8 @@ class Tape {
   using Values = std::vector<Value>;
   /// Итератор вектора из элементов.
   using ValuesIterator = typename Values::iterator;
+  /// Константный итератор вектора из элементов.
+  using ValuesConstIterator = typename Values::const_iterator;
 
   Tape() = default;
   Tape(const Tape &other) = delete;
@@ -68,7 +70,7 @@ class Tape {
    * \return итератор, указывающий на последний записанный элемент либо на конец полуинтервала, если
    * были записаны все элементы.
    */
-  virtual ValuesIterator WriteN(ValuesIterator begin, ValuesIterator end) = 0;
+  virtual ValuesConstIterator WriteN(ValuesConstIterator begin, ValuesConstIterator end) = 0;
   /**
    * \brief Передвинуть указатель вперед на одну позицию.
    *

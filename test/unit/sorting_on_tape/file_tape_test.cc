@@ -188,6 +188,23 @@ TEST_F(FileTapeTest, WriteToMutableFileTape) {
   VerifyContentEquals(new_content, actual_content);
 }
 
+TEST_F(FileTapeTest, WriteToMutableFileTapeUsingIterators) {
+  const auto file_name = file_prefix_ / "file";
+  const std::string before_write = "Test content";
+  const std::string new_content = "Updated message";
+  const std::vector new_content_chars(new_content.begin(), new_content.end());
+  CreateFileWithBinaryContent(file_name, before_write);
+  FileTape<char, true> under_test(config_, file_name);
+
+  const auto last_written = under_test.WriteN(new_content_chars.begin(), new_content_chars.end());
+  under_test.MoveToBegin();
+  const auto actual_content = ReadAllFromTape(under_test);
+
+  const auto written = std::distance(new_content_chars.begin(), last_written);
+  EXPECT_EQ(new_content.size(), written);
+  VerifyContentEquals(new_content, actual_content);
+}
+
 TEST_F(FileTapeTest, AppendToMutableFileTape) {
   const auto file_name = file_prefix_ / "file";
   const std::string before_write = "Test content";

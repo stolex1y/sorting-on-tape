@@ -9,6 +9,7 @@ add_executable(${TEST_TARGET}
         fake_configuration.h
         test_utils.h
         test_utils.cc
+        tape_sorter_test.cc
 )
 target_include_directories(${TEST_TARGET} PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
 

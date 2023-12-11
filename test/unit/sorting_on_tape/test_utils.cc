@@ -7,7 +7,7 @@
 
 namespace sot::test {
 
-std::vector<std::int64_t> GenerateRandomSequence(const size_t size, const int64_t seed) {
+std::vector<std::int64_t> GenerateRandomArray(const size_t size, const int64_t seed) {
   std::vector<std::int64_t> numbers(size, 0);
   std::ranges::generate(numbers, [generator = std::mt19937_64(seed)]() mutable {
     return static_cast<std::int64_t>(generator());

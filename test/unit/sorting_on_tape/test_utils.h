@@ -15,7 +15,7 @@ namespace sot::test {
 /**
  * \brief Сгенерировать вектор из заданного количества случайных чисел.
  */
-std::vector<std::int64_t> GenerateRandomSequence(
+std::vector<std::int64_t> GenerateRandomArray(
     size_t size, std::int64_t seed = std::random_device()()
 );
 

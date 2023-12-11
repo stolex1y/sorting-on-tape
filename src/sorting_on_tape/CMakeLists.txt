@@ -9,6 +9,7 @@ add_library(${OBJ_LIB_TARGET} OBJECT
         configuration.h
         temp_tape_provider.h
         temp_file_tape_provider.h
+        memory_literals.h
 )
 target_include_directories(${OBJ_LIB_TARGET} PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"

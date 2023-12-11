@@ -223,7 +223,7 @@ TEST_F(FileTapeTest, AppendToMutableFileTape) {
 
 TEST_F(FileTapeTest, WriteInt) {
   const auto file_name = file_prefix_ / "file";
-  std::vector<int64_t> written_numbers(1024, 0);
+  std::vector<std::int64_t> written_numbers(1024, 0);
   std::generate(
       written_numbers.begin(),
       written_numbers.end(),
@@ -231,7 +231,7 @@ TEST_F(FileTapeTest, WriteInt) {
         return random();
       }
   );
-  FileTape<int64_t, true> under_test(config_, file_name);
+  FileTape<std::int64_t, true> under_test(config_, file_name);
 
   const auto written = under_test.WriteN(written_numbers);
   under_test.MoveToBegin();

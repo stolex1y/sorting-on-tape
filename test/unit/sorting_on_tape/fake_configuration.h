@@ -3,6 +3,7 @@
 
 #include "configuration.h"
 #include "file_tape.h"
+#include "tape_sorter.h"
 
 namespace sot::test {
 
@@ -37,6 +38,10 @@ class FakeConfiguration : public Configuration {
    * \brief Установить нулевое значение всех задержек.
    */
   void SetZeroDurations();
+  /**
+   * \brief Установить ограничение по использованию памяти в байтах.
+   */
+  void SetMemoryLimit(size_t limit_size);
 };
 
 template <typename Duration>
@@ -66,6 +71,10 @@ inline void FakeConfiguration::SetZeroDurations() {
   SetReadDuration(0ms);
   SetRewindDuration(0ms);
   SetMoveDuration(0ms);
+}
+
+inline void FakeConfiguration::SetMemoryLimit(const size_t limit_size) {
+  params[TapeSorter<FileTape<>::ValueT>::kMemoryLimitKey] = limit_size;
 }
 
 }  // namespace sot::test

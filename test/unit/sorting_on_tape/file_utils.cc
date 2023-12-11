@@ -4,11 +4,16 @@
 
 namespace sot::test::files {
 
-void CreateDir(const std::string& directories) {
-  std::filesystem::create_directories(directories);
+void CreateDirWithReplace(const std::filesystem::path &directories) {
+  if (exists(directories)) {
+    remove_all(directories);
+  }
+  create_directories(directories);
 }
 
-void CreateFileWithContent(const std::string& file_name, const std::string& content) {
+void CreateFileWithBinaryContent(
+    const std::filesystem::path &file_name, const std::string &content
+) {
   std::fstream file(file_name, std::ios_base::out | std::ios_base::trunc);
   file << content;
 }

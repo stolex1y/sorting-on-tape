@@ -2,8 +2,11 @@
 #define FAKE_CONFIGURATION_H
 
 #include "configuration.h"
+#include "file_tape.h"
 
 namespace sot::test {
+
+using namespace std::chrono_literals;
 
 /**
  * \brief Конфигуратор параметров для тестов.
@@ -30,6 +33,10 @@ class FakeConfiguration : public Configuration {
    */
   template <typename Duration>
   void SetRewindDuration(Duration duration);
+  /**
+   * \brief Установить нулевое значение всех задержек.
+   */
+  void SetZeroDurations();
 };
 
 template <typename Duration>
@@ -52,6 +59,13 @@ template <typename Duration>
 void FakeConfiguration::SetRewindDuration(Duration duration) {
   params[FileTape<>::kRewindDurationKey] =
       std::chrono::floor<FileTape<>::Duration>(duration).count();
+}
+
+inline void FakeConfiguration::SetZeroDurations() {
+  SetWriteDuration(0ms);
+  SetReadDuration(0ms);
+  SetRewindDuration(0ms);
+  SetMoveDuration(0ms);
 }
 
 }  // namespace sot::test

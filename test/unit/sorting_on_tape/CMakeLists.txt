@@ -7,6 +7,8 @@ add_executable(${TEST_TARGET}
         file_utils.cc
         file_utils.h
         fake_configuration.h
+        test_utils.h
+        test_utils.cc
 )
 target_include_directories(${TEST_TARGET} PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
 

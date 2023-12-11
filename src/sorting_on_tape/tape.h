@@ -14,6 +14,18 @@ namespace sot {
 template <typename Value = std::int32_t>
 class Tape {
  public:
+  /// Тип данных для хранения на устройстве.
+  using ValueT = Value;
+  /// Вектор, состоящий из элементов.
+  using Values = std::vector<Value>;
+  /// Итератор вектора из элементов.
+  using ValuesIterator = typename Values::iterator;
+
+  Tape() = default;
+  Tape(const Tape &other) = delete;
+  Tape(Tape &&other) = default;
+  Tape &operator=(const Tape &other) = delete;
+  Tape &operator=(Tape &&other) = default;
   virtual ~Tape() = default;
 
   /**
@@ -31,7 +43,7 @@ class Tape {
    * \return список значений, которые были прочитаны, причем количество прочитанных значений может
    * быть меньше чем n, если, например, достигнут конец ленты.
    */
-  virtual std::vector<Value> ReadN(size_t n) = 0;
+  virtual Values ReadN(size_t n) = 0;
   /**
    * \brief Записать значение на текущую позицию.
    *
@@ -45,7 +57,18 @@ class Tape {
    *
    * \return количество записанных значений.
    */
-  virtual size_t WriteN(const std::vector<Value> &values) = 0;
+  virtual size_t WriteN(const Values &values) = 0;
+  /**
+   * \brief Записать значения из заданного диапазона, начиная с текущей позиции.
+   *
+   * При этом после выполнения операции указатель находится за последним записанным значением.
+   *
+   * \param begin начало записываемого полуинтервала.
+   * \param end конец записываемого полуинтервала.
+   * \return итератор, указывающий на последний записанный элемент либо на конец полуинтервала, если
+   * были записаны все элементы.
+   */
+  virtual ValuesIterator WriteN(ValuesIterator begin, ValuesIterator end) = 0;
   /**
    * \brief Передвинуть указатель вперед на одну позицию.
    *

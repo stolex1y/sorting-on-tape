@@ -21,6 +21,12 @@ namespace sot {
 template <typename Value = int32_t, bool Mutable = true>
 class FileTape : public Tape<Value> {
  public:
+  /// Тип данных для хранения на устройстве.
+  using ValueT = typename Tape<Value>::ValueT;
+  /// Вектор, состоящий из элементов.
+  using Values = typename Tape<Value>::Values;
+  /// Итератор вектора из элементов.
+  using ValuesIterator = typename Tape<Value>::ValuesIterator;
   /// Единицы измерения "задержек" устройства.
   using Duration = std::chrono::milliseconds;
 
@@ -47,10 +53,16 @@ class FileTape : public Tape<Value> {
   static constexpr auto kRewindDurationDefault = 60;
 
   FileTape(const Configuration &config, const std::string &file_name);
+  FileTape(FileTape &&other) = default;
+  FileTape(const FileTape &other) = delete;
+  FileTape &operator=(const FileTape &other) = delete;
+  FileTape &operator=(FileTape &&other) = default;
+
   std::optional<Value> Read() override;
-  std::vector<Value> ReadN(size_t n) override;
+  Values ReadN(size_t n) override;
   bool Write(const Value &value) override;
-  size_t WriteN(const std::vector<Value> &values) override;
+  size_t WriteN(const Values &values) override;
+  ValuesIterator WriteN(ValuesIterator begin, ValuesIterator end) override;
   bool MoveForward() override;
   bool MoveBackward() override;
   void MoveToBegin() override;
@@ -105,7 +117,7 @@ std::optional<Value> FileTape<Value, Mutable>::Read() {
 }
 
 template <typename Value, bool Mutable>
-std::vector<Value> FileTape<Value, Mutable>::ReadN(const size_t n) {
+auto FileTape<Value, Mutable>::ReadN(const size_t n) -> Values {
   std::vector<Value> values;
   for (size_t i = 0; i < n; ++i) {
     const auto value = Read();
@@ -131,7 +143,7 @@ bool FileTape<Value, Mutable>::Write(const Value &value) {
 }
 
 template <typename Value, bool Mutable>
-size_t FileTape<Value, Mutable>::WriteN(const std::vector<Value> &values) {
+size_t FileTape<Value, Mutable>::WriteN(const Values &values) {
   size_t i;
   for (i = 0; i < values.size(); ++i) {
     if (!Write(values[i])) {
@@ -139,6 +151,17 @@ size_t FileTape<Value, Mutable>::WriteN(const std::vector<Value> &values) {
     }
   }
   return i;
+}
+
+template <typename Value, bool Mutable>
+auto FileTape<Value, Mutable>::WriteN(ValuesIterator begin, ValuesIterator end) -> ValuesIterator {
+  while (begin < end) {
+    if (!Write(*begin)) {
+      break;
+    }
+    ++begin;
+  }
+  return begin;
 }
 
 template <typename Value, bool Mutable>

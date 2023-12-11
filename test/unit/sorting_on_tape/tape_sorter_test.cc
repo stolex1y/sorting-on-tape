@@ -49,7 +49,7 @@ void TapeSorterTest::SortTape(Tape<Value> &input_tape, Tape<Value> &output_tape)
 TEST_F(TapeSorterTest, SortRandomArrayWithoutMemoryLimit) {
   const auto input_file_name = file_prefix_ / "input";
   const auto output_file_name = file_prefix_ / "output";
-  constexpr auto numbers_count = 1000;
+  constexpr auto numbers_count = 1000000;
 
   auto expected_numbers = GenerateRandomArray(numbers_count);
   CreateFileWithBinaryContent(input_file_name, expected_numbers);
@@ -68,9 +68,9 @@ TEST_F(TapeSorterTest, SortRandomArrayWithoutMemoryLimit) {
 TEST_F(TapeSorterTest, SortRandomArrayWithMemoryLimit) {
   const auto input_file_name = file_prefix_ / "input";
   const auto output_file_name = file_prefix_ / "output";
-  constexpr auto numbers_count = 100000;
+  constexpr auto numbers_count = 1000;
 
-  config_.SetMemoryLimit(1_KiB);
+  config_.SetMemoryLimit(10 * sizeof(Value) + 1);
 
   auto expected_numbers = GenerateRandomArray(numbers_count);
   CreateFileWithBinaryContent(input_file_name, expected_numbers);

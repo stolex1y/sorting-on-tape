@@ -9,7 +9,7 @@ Configuration::Configuration(const std::string &file_name) {
   ReadParamsFromFile(file_name);
 }
 
-std::int64_t Configuration::GetProperty(const std::string &key, const std::int64_t default_value)
+std::uint64_t Configuration::GetProperty(const std::string &key, const std::uint64_t default_value)
     const {
   const auto value = params.find(key);
   if (value != params.end()) {
@@ -25,12 +25,14 @@ void Configuration::ReadParamsFromFile(const std::string &file_name) {
   }
   std::string key;
   while (getline(input, key, '=')) {
-    int64_t value;
-    input >> value;
-    if (input.fail()) {
-      input.clear();
-    } else {
-      params.emplace(key, value);
+    if (!key.starts_with("#")) {
+      uint64_t value;
+      input >> value;
+      if (input.fail()) {
+        input.clear();
+      } else {
+        params.emplace(key, value);
+      }
     }
     input.ignore(std::numeric_limits<std::streamsize>::max(), input.widen('\n'));
   }

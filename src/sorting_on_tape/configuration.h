@@ -23,10 +23,10 @@ class Configuration {
   /**
    * \brief Получить значение свойства по ключу либо переданное значение по умолчанию.
    */
-  std::int64_t GetProperty(const std::string &key, std::int64_t default_value) const;
+  std::uint64_t GetProperty(const std::string &key, std::uint64_t default_value) const;
 
  protected:
-  std::unordered_map<std::string, std::int64_t> params;
+  std::unordered_map<std::string, std::uint64_t> params;
 
  private:
   /**

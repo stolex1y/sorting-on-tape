@@ -13,32 +13,20 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-#
-#      - name: Configure git
-#        run: |
-#          git config user.name "GitHub Actions"
-#          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - uses: release-drafter/release-drafter@v5
         id: release-drafter
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
-#      - name: Update version
-#        run: |
-#          NEW_VERSION=$(echo "${{ steps.release-drafter.outputs.tag_name }}" | sed 's/v//')
-#          echo $NEW_VERSION > version.txt
-#          git add version.txt
-#          git commit -m "Release ${{ steps.release-drafter.outputs.tag_name }}" && git push || echo "Version already up to date"
-
-#      - name: Create release
-#        uses: ncipollo/release-action@v1
-#        with:
-#          body: ${{ steps.release-drafter.outputs.body }}
-#          id: ${{ steps.release-drafter.outputs.id }}
-#          prerelease: false
-#          draft: true
-#          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-#          tag: ${{ steps.release-drafter.outputs.tag_name }}
-#          allowUpdates: true
-#          name: ${{ steps.release-drafter.outputs.name }}
+      - name: Create prerelease
+        uses: ncipollo/release-action@v1
+        with:
+          body: ${{ steps.release-drafter.outputs.body }}
+          prerelease: true
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          tag: ${{ steps.release-drafter.outputs.tag_name }}
+          replacesArtifacts: true
+          allowUpdates: true
+          makeLatest: true
+          name: ${{ steps.release-drafter.outputs.name }}

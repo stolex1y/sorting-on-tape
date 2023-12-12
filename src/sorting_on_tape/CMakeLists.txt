@@ -1,8 +1,8 @@
-set(OBJ_LIB_TARGET ${CMAKE_PROJECT_NAME})
-set(RUNNABLE_TARGET "${OBJ_LIB_TARGET}-runnable")
-set(STATIC_LIB_TARGET "${OBJ_LIB_TARGET}-static")
+set(OBJ_LIB ${CMAKE_PROJECT_NAME})
+set(RUNNABLE "${CMAKE_PROJECT_NAME}-runnable")
+set(STATIC_LIB "${CMAKE_PROJECT_NAME}-static")
 
-add_library(${OBJ_LIB_TARGET} OBJECT
+add_library(${OBJ_LIB} OBJECT
         tape.h
         file_tape.h
         configuration.cc
@@ -12,29 +12,29 @@ add_library(${OBJ_LIB_TARGET} OBJECT
         memory_literals.h
         tape_sorter.h
 )
-target_include_directories(${OBJ_LIB_TARGET} PUBLIC
+target_include_directories(${OBJ_LIB} PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 
 #warnings
-target_compile_options(${OBJ_LIB_TARGET} PRIVATE "-Werror" "-Wall" "-Wextra" "-Wpedantic")
+target_compile_options(${OBJ_LIB} PRIVATE "-Werror" "-Wall" "-Wextra" "-Wpedantic")
 
-add_executable(${RUNNABLE_TARGET}
+add_executable(${RUNNABLE}
         main.cc
 )
-target_link_libraries(${RUNNABLE_TARGET} PUBLIC ${OBJ_LIB_TARGET})
+target_link_libraries(${RUNNABLE} PUBLIC ${OBJ_LIB})
 
 # clang-format
 include(Format)
-Format(${RUNNABLE_TARGET} .)
+Format(${RUNNABLE} .)
 
-add_library(${STATIC_LIB_TARGET} STATIC)
-target_link_libraries(${STATIC_LIB_TARGET} ${OBJ_LIB_TARGET})
+add_library(${STATIC_LIB} STATIC)
+target_link_libraries(${STATIC_LIB} ${OBJ_LIB})
 
 # copy config.properties
 add_custom_command(
-        TARGET ${RUNNABLE_TARGET} POST_BUILD
+        TARGET ${RUNNABLE} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/config.properties
         ${CMAKE_CURRENT_BINARY_DIR}/config.properties

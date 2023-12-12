@@ -156,7 +156,8 @@ size_t FileTape<Value, Mutable>::WriteN(const Values &values) {
 }
 
 template <typename Value, bool Mutable>
-auto FileTape<Value, Mutable>::WriteN(ValuesConstIterator begin, ValuesConstIterator end) -> ValuesConstIterator {
+auto FileTape<Value, Mutable>::WriteN(ValuesConstIterator begin, ValuesConstIterator end)
+    -> ValuesConstIterator {
   while (begin < end) {
     if (!Write(*begin)) {
       break;

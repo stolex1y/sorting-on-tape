@@ -40,14 +40,13 @@ void TapeSorterBenchmark::SetUpMemoryLimit(const std::size_t number_count, const
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortRandomArray)(::benchmark::State &state) {
   const auto number_count = state.range(0);
-  // SetUpMemoryLimit(number_count);
+  SetUpMemoryLimit(number_count);
   const auto numbers = InitInputDataWithRandomNumbers(number_count);
   for (auto _ : state) {
     const auto sorted_numbers = SortTape();
   }
 }
-// BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortRandomArray)->Arg(40)->Arg(400)->Arg(4000);
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortRandomArray)->Iterations(1)->Arg(40);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortRandomArray)->Arg(40)->Arg(400)->Arg(4000);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedArray)(::benchmark::State &state) {
   const size_t number_count = state.range(0);
@@ -59,7 +58,7 @@ BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedArray)(::benchmark::State &sta
     const auto sorted_numbers = SortTape();
   }
 }
-// BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedArray)->Arg(40)->Arg(400)->Arg(4000);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedArray)->Arg(40)->Arg(400)->Arg(4000);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)(::benchmark::State &state) {
   const size_t number_count = state.range(0);
@@ -71,10 +70,10 @@ BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)(::benchma
     const auto sorted_numbers = SortTape();
   }
 }
-// BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)
-// ->Arg(40)
-// ->Arg(400)
-// ->Arg(4000);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)
+    ->Arg(40)
+    ->Arg(400)
+    ->Arg(4000);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)(::benchmark::State &state) {
   constexpr size_t number_count = 1000;
@@ -84,11 +83,7 @@ BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)(::benchmark::S
     const auto sorted_numbers = SortTape();
   }
 }
-// BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)
-// ->Arg(8)
-// ->Arg(4)
-// ->Arg(2)
-// ->Arg(1);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)->Arg(8)->Arg(4)->Arg(2)->Arg(1);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)(::benchmark::State &state) {
   constexpr size_t number_count = 500;
@@ -99,10 +94,7 @@ BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)(::benchmar
     const auto sorted_numbers = SortTape();
   }
 }
-// BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)
-// ->Arg(1)
-// ->Arg(4)
-// ->Arg(16);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)->Arg(1)->Arg(4)->Arg(16);
 
 BENCHMARK_MAIN();
 

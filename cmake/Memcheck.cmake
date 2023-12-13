@@ -10,7 +10,7 @@ function(AddMemcheck target)
     set(MEMCHECK_PATH ${memcheck-cover_SOURCE_DIR}/bin)
     set(REPORT_PATH "${CMAKE_BINARY_DIR}/valgrind-${target}")
 
-    add_custom_target(memcheck-${target}
+    add_custom_target(${target}-memcheck
             COMMAND ${MEMCHECK_PATH}/memcheck_runner.sh -o
             "${REPORT_PATH}/report"
             -- $<TARGET_FILE:${target}>

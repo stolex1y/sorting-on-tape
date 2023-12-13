@@ -8,6 +8,8 @@ on:
 
 env:
   BUILD_DIR: "cmake-build-debug"
+  TEST_TARGET: "sorting-on-tape-test-runnable"
+  VALGRIND_OUT: "valgrind-sorting-on-tape-test-runnable"
 
 jobs:
   vars:
@@ -78,9 +80,9 @@ jobs:
           ABS_BUILD_DIR=`pwd`
           cd test/unit/sorting_on_tape
           $ABS_BUILD_DIR/_deps/memcheck-cover-src/bin/memcheck_runner.sh \
-            -o $ABS_BUILD_DIR/valgrind-sorting-on-tape-test/report -- $ABS_BUILD_DIR/test/unit/sorting_on_tape/sorting-on-tape-test \
-            && $ABS_BUILD_DIR/_deps/memcheck-cover-src/bin/generate_html_report.sh -i $ABS_BUILD_DIR/valgrind-sorting-on-tape-test \
-            -o $ABS_BUILD_DIR/valgrind-sorting-on-tape-test
+            -o $ABS_BUILD_DIR/$VALGRIND_OUT/report -- $ABS_BUILD_DIR/test/unit/sorting_on_tape/$TEST_TARGET \
+            && $ABS_BUILD_DIR/_deps/memcheck-cover-src/bin/generate_html_report.sh -i $ABS_BUILD_DIR/$VALGRIND_OUT \
+            -o $ABS_BUILD_DIR/$VALGRIND_OUT
 
       - name: Upload valgrind report if failed
         uses: actions/upload-artifact@v3

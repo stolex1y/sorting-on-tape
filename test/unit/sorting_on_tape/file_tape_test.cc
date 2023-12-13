@@ -39,7 +39,7 @@ FileTape<char, Mutable> FileTapeTest::InitTapeWithContent(const std::string &con
 TEST_F(FileTapeTest, ReadFromMutableFileTape) {
   FileTape under_test = InitTapeWithContent<true>();
 
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   VerifyContentEquals(kDefaultTestContent, actual_content);
 }
@@ -60,7 +60,7 @@ TEST_F(FileTapeTest, ReadFromEmptyTape) {
   const std::string content;
   FileTape under_test = InitTapeWithContent(content);
 
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   VerifyContentEquals(content, actual_content);
   VerifyCursorAtTheEnd(under_test);
@@ -94,7 +94,7 @@ TEST_F(FileTapeTest, MoveForwardToReadPartOfContent) {
   for (size_t i = 0; i < skip; ++i) {
     under_test.MoveForward();
   }
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   VerifyContentEquals(kDefaultTestContent.substr(skip), actual_content);
 }
@@ -128,9 +128,9 @@ TEST_F(FileTapeTest, MoveToBegin) {
 TEST_F(FileTapeTest, ReadFullContentTwice) {
   FileTape under_test = InitTapeWithContent();
 
-  const auto first_content = ReadAllFromTape(under_test);
+  const auto first_content = ReadAllFromTapeAsString(under_test);
   under_test.MoveToBegin();
-  const auto second_content = ReadAllFromTape(under_test);
+  const auto second_content = ReadAllFromTapeAsString(under_test);
 
   VerifyContentEquals(kDefaultTestContent, first_content);
   VerifyContentEquals(kDefaultTestContent, second_content);
@@ -142,7 +142,7 @@ TEST_F(FileTapeTest, WriteToImmutableFileTape) {
 
   const auto written = under_test.WriteN({new_content.begin(), new_content.end()});
   under_test.MoveToBegin();
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   EXPECT_EQ(0, written) << "Mustn't be written to immutable tape";
   VerifyContentEquals(kDefaultTestContent, actual_content);
@@ -154,7 +154,7 @@ TEST_F(FileTapeTest, WriteToMutableFileTape) {
 
   const auto written = under_test.WriteN({new_content.begin(), new_content.end()});
   under_test.MoveToBegin();
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   EXPECT_EQ(new_content.size(), written);
   VerifyContentEquals(new_content, actual_content);
@@ -167,7 +167,7 @@ TEST_F(FileTapeTest, WriteToMutableFileTapeUsingIterators) {
 
   const auto last_written = under_test.WriteN(new_content_chars.begin(), new_content_chars.end());
   under_test.MoveToBegin();
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   const auto written = std::distance(new_content_chars.begin(), last_written);
   EXPECT_EQ(new_content.size(), written);
@@ -181,15 +181,16 @@ TEST_F(FileTapeTest, AppendToMutableFileTape) {
   under_test.MoveToEnd();
   const auto written = under_test.WriteN({appended_content.begin(), appended_content.end()});
   under_test.MoveToBegin();
-  const auto actual_content = ReadAllFromTape(under_test);
+  const auto actual_content = ReadAllFromTapeAsString(under_test);
 
   EXPECT_EQ(appended_content.size(), written);
   VerifyContentEquals(kDefaultTestContent + appended_content, actual_content);
 }
 
 TEST_F(FileTapeTest, WriteInt) {
-  const std::vector<std::int64_t> written_numbers = GenerateRandomArray(1000);
-  FileTape<std::int64_t, true> under_test(config_, input_file_path_);
+  using Value = std::int64_t;
+  const auto written_numbers = GenerateRandomArray<Value>(1000);
+  FileTape<Value, true> under_test(config_, input_file_path_);
 
   const auto written = under_test.WriteN(written_numbers);
   under_test.MoveToBegin();
@@ -208,7 +209,7 @@ TEST_F(FileTapeTest, ReadDelay) {
   FileTape under_test = InitTapeWithContent(content);
 
   const auto actual_duration = Measure<seconds>([&under_test] {
-    ReadAllFromTape(under_test);
+    ReadAllFromTapeAsString(under_test);
   });
 
   EXPECT_EQ(expected_duration, actual_duration);

@@ -23,62 +23,63 @@ TapeSorterTest::TapeSorterTest() {
 }
 
 TEST_F(TapeSorterTest, SortRandomArrayWithoutMemoryLimit) {
-  const auto expected_numbers = InitInputDataWithRandomNumbers(1000000);
+  const auto expected_values = InitInputDataWithRandomValues(100000);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, SortRandomArrayWithMemoryLimit) {
-  const auto expected_numbers = InitInputDataWithRandomNumbers(1000);
-  config_.SetMemoryLimit(10 * sizeof(Value) + 1);
+  constexpr auto value_count = 100000;
+  const auto expected_values = InitInputDataWithRandomValues(value_count);
+  config_.SetMemoryLimit(value_count * sizeof(Value) / 100);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, SortEmptyArray) {
-  const std::vector<Value> expected_numbers = InitInputDataWithRandomNumbers(0);
+  const std::vector<Value> expected_values = InitInputDataWithRandomValues(0);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, SortArrayWithOneElement) {
-  const std::vector<Value> expected_numbers{10};
-  CreateFileWithBinaryContent(input_file_path_, expected_numbers);
+  const std::vector<Value> expected_values{10};
+  CreateFileWithBinaryContent(input_file_path_, expected_values);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, SortSortedArray) {
-  auto expected_numbers = GenerateRandomArray(10000);
-  std::ranges::sort(expected_numbers);
-  CreateFileWithBinaryContent(input_file_path_, expected_numbers);
+  auto expected_values = GenerateRandomArray<Value>(100000);
+  std::ranges::sort(expected_values);
+  CreateFileWithBinaryContent(input_file_path_, expected_values);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, SortSortedInReverseOrderArray) {
-  auto expected_numbers = GenerateRandomArray(10000);
-  std::ranges::sort(expected_numbers, std::greater());
-  CreateFileWithBinaryContent(input_file_path_, expected_numbers);
-  std::ranges::reverse(expected_numbers);
+  auto expected_values = GenerateRandomArray<Value>(100000);
+  std::ranges::sort(expected_values, std::greater());
+  CreateFileWithBinaryContent(input_file_path_, expected_values);
+  std::ranges::reverse(expected_values);
 
-  const auto actual_numbers = SortTape();
+  const auto actual_values = SortTape();
 
-  VerifyContentEquals(expected_numbers, actual_numbers);
+  VerifyContentEquals(expected_values, actual_values);
 }
 
 TEST_F(TapeSorterTest, TooSmallMemoryLimit) {
-  const auto expected_numbers = InitInputDataWithRandomNumbers(10);
+  const auto expected_values = InitInputDataWithRandomValues(10);
   config_.SetMemoryLimit(sizeof(Value));
 
   ASSERT_THROW(SortTape(), std::invalid_argument);

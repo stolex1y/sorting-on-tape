@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <random>
@@ -12,12 +13,32 @@
 #include "file_tape.h"
 
 namespace sot::test {
+
 /**
  * \brief Сгенерировать вектор из заданного количества случайных чисел.
  */
-std::vector<std::int64_t> GenerateRandomArray(
-    size_t size, std::int64_t seed = std::random_device()()
-);
+template <typename Value>
+requires(std::is_integral_v<Value>) std::vector<Value> GenerateRandomArray(
+    const size_t size, const std::int64_t seed = std::random_device()()
+) {
+  std::vector<Value> numbers(size, 0);
+  std::ranges::generate(numbers, [generator = std::mt19937_64(seed)]() mutable {
+    return static_cast<Value>(generator());
+  });
+  return numbers;
+}
+
+/**
+ * \brief Сгенерировать вектор из заданного количества случайных латинских заглавных букв.
+ */
+template <>
+inline std::vector<char> GenerateRandomArray<char>(const size_t size, const std::int64_t seed) {
+  std::vector<char> chars(size, 0);
+  std::ranges::generate(chars, [generator = std::mt19937(seed)]() mutable {
+    return static_cast<char>(generator() % 26 + 65);
+  });
+  return chars;
+}
 
 /**
  * \brief Вывести вектор со значениями в поток вывода.
@@ -42,7 +63,7 @@ std::ostream &operator<<(std::ostream &out, const std::vector<Value> &values) {
  * Чтение происходит с заданной позиции.
  * \return прочитанные символы, преобразованные в строку.
  */
-std::string ReadAllFromTape(Tape<char> &tape);
+std::string ReadAllFromTapeAsString(Tape<char> &tape);
 
 /**
  * \brief Прочитать все содержимое устройства.

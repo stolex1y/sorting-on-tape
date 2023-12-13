@@ -3,7 +3,6 @@
 
 #include <filesystem>
 
-#include "fake_configuration.h"
 #include "file_tape.h"
 #include "file_utils.h"
 #include "tape_sorter.h"
@@ -33,13 +32,13 @@ class TapeSorterTestBase : public TestBase {
    */
   [[nodiscard]] std::vector<Value> SortTape() const;
   /**
-   * \brief Создать файл, заполненный случайными числами.
+   * \brief Создать файл, заполненный случайными значениями.
    *
    * Файл создатся по пути @link input_file_path_ @endlink.
    *
    * \return сгенерированный массив.
    */
-  [[nodiscard]] std::vector<Value> InitInputDataWithRandomNumbers(size_t numbers_count) const;
+  [[nodiscard]] std::vector<Value> InitInputDataWithRandomValues(size_t values_count) const;
 };
 
 template <typename Value>
@@ -62,13 +61,13 @@ std::vector<Value> TapeSorterTestBase<Value>::SortTape() const {
 }
 
 template <typename Value>
-std::vector<Value> TapeSorterTestBase<Value>::InitInputDataWithRandomNumbers(
-    const size_t numbers_count
+std::vector<Value> TapeSorterTestBase<Value>::InitInputDataWithRandomValues(
+    const size_t values_count
 ) const {
-  auto expected_numbers = GenerateRandomArray(numbers_count);
-  CreateFileWithBinaryContent(input_file_path_, expected_numbers);
-  std::ranges::sort(expected_numbers);
-  return expected_numbers;
+  auto expected_values = GenerateRandomArray<Value>(values_count);
+  CreateFileWithBinaryContent(input_file_path_, expected_values);
+  std::ranges::sort(expected_values);
+  return expected_values;
 }
 
 }  // namespace sot::test

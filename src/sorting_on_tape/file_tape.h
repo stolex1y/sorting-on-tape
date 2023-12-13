@@ -30,7 +30,7 @@ class FileTape : public Tape<Value> {
   /// Константный итератор вектора из элементов.
   using ValuesConstIterator = typename Tape<Value>::ValuesConstIterator;
   /// Единицы измерения "задержек" устройства.
-  using Duration = std::chrono::milliseconds;
+  using Duration = std::chrono::microseconds;
 
   /// Ключ в конфигурации,
   /// задающий задержку чтения с устройства в @link Duration заданных единицах@endlink.
@@ -46,13 +46,13 @@ class FileTape : public Tape<Value> {
   static constexpr auto kRewindDurationKey = "rewind_duration";
 
   /// Значение задержки чтения по умолчанию в @link Duration заданных единицах@endlink.
-  static constexpr auto kReadDurationDefault = 15;
+  static constexpr auto kReadDurationDefault = 7;
   /// Значение задержки записи по умолчанию в @link Duration заданных единицах@endlink.
-  static constexpr auto kWriteDurationDefault = 20;
+  static constexpr auto kWriteDurationDefault = 7;
   /// Значение задержки перемотки по умолчанию в @link Duration заданных единицах@endlink.
   static constexpr auto kMoveDurationDefault = 1;
   /// Значение задержки сдвига по умолчанию в @link Duration заданных единицах@endlink.
-  static constexpr auto kRewindDurationDefault = 60;
+  static constexpr auto kRewindDurationDefault = 100;
 
   FileTape(const Configuration &config, const std::string &file_name);
   FileTape(FileTape &&other) = default;

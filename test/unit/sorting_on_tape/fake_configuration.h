@@ -67,10 +67,10 @@ void FakeConfiguration::SetRewindDuration(Duration duration) {
 }
 
 inline void FakeConfiguration::SetZeroDurations() {
-  SetWriteDuration(0ms);
-  SetReadDuration(0ms);
-  SetRewindDuration(0ms);
-  SetMoveDuration(0ms);
+  SetWriteDuration(0us);
+  SetReadDuration(0us);
+  SetRewindDuration(0us);
+  SetMoveDuration(0us);
 }
 
 inline void FakeConfiguration::SetMemoryLimit(const size_t limit_size) {

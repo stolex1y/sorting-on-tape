@@ -4,9 +4,6 @@ on:
   release:
     types:
       - prereleased
-      - edited
-      - published
-      - created
       - released
 
 env:

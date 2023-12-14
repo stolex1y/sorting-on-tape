@@ -11,6 +11,10 @@ add_library(${OBJ_LIB} OBJECT
         temp_file_tape_provider.h
         memory_literals.h
         tape_sorter.h
+        core/thread_pool.cc
+        core/thread_pool.h
+        core/tasks.h
+        core/concurrent_queue.h
 )
 target_include_directories(${OBJ_LIB} PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"

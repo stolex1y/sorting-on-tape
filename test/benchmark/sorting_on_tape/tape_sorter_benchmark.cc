@@ -84,7 +84,7 @@ BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)
     ->Arg(25000);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)(::benchmark::State &state) {
-  constexpr size_t value_count = 20000;
+  constexpr size_t value_count = 40000;
   SetUpMemoryLimit(value_count, state.range(0));
   SetUpPerThreadCount(value_count);
   const auto values = InitInputDataWithRandomValues(value_count);

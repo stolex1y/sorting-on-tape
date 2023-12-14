@@ -4,7 +4,7 @@
 
 namespace sot::test::benchmark {
 
-using Value = std::int64_t;
+using Value = std::int32_t;
 
 class TapeSorterBenchmark : public TapeSorterTestBase<Value>, public ::benchmark::Fixture {
  public:
@@ -12,6 +12,7 @@ class TapeSorterBenchmark : public TapeSorterTestBase<Value>, public ::benchmark
   void TearDown(::benchmark::State &st) override;
   void SetUpTapeDurations(std::chrono::microseconds base_duration = 5us);
   void SetUpMemoryLimit(std::size_t value_count, uint64_t divider = 10);
+  void SetUpPerThreadCount(std::size_t value_count);
 };
 
 void TapeSorterBenchmark::SetUp(::benchmark::State &st) {
@@ -38,9 +39,14 @@ void TapeSorterBenchmark::SetUpMemoryLimit(const std::size_t value_count, const 
   config_.SetMemoryLimit(value_count * sizeof(Value) / divider);
 }
 
+void TapeSorterBenchmark::SetUpPerThreadCount(const std::size_t value_count) {
+  config_.SetMaxValueCountPerThread(value_count / std::thread::hardware_concurrency());
+}
+
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortRandomArray)(::benchmark::State &state) {
   const auto value_count = state.range(0);
   SetUpMemoryLimit(value_count);
+  SetUpPerThreadCount(value_count);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {
     const auto sorted_values = SortTape();
@@ -51,6 +57,7 @@ BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortRandomArray)->Arg(5000)->Arg(10000
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedArray)(::benchmark::State &state) {
   const size_t value_count = state.range(0);
   SetUpMemoryLimit(value_count);
+  SetUpPerThreadCount(value_count);
   auto expected_values = GenerateRandomArray<Value>(value_count);
   std::ranges::sort(expected_values);
   CreateFileWithBinaryContent(input_file_path_, expected_values);
@@ -63,6 +70,7 @@ BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedArray)->Arg(5000)->Arg(10000
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)(::benchmark::State &state) {
   const size_t value_count = state.range(0);
   SetUpMemoryLimit(value_count);
+  SetUpPerThreadCount(value_count);
   auto expected_values = GenerateRandomArray<Value>(value_count);
   std::ranges::sort(expected_values, std::greater());
   CreateFileWithBinaryContent(input_file_path_, expected_values);
@@ -78,6 +86,7 @@ BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)(::benchmark::State &state) {
   constexpr size_t value_count = 20000;
   SetUpMemoryLimit(value_count, state.range(0));
+  SetUpPerThreadCount(value_count);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {
     const auto sorted_values = SortTape();
@@ -88,11 +97,13 @@ BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)
     ->Arg(5)
     ->Arg(20)
     ->Arg(100)
-    ->Arg(1000);
+    ->Arg(1000)
+    ->Arg(10000);
 
 BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)(::benchmark::State &state) {
   constexpr size_t value_count = 20000;
   SetUpMemoryLimit(value_count);
+  SetUpPerThreadCount(value_count);
   SetUpTapeDurations(state.range(0) * 1us);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {

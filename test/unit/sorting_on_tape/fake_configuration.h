@@ -42,6 +42,10 @@ class FakeConfiguration : public Configuration {
    * \brief Установить ограничение по использованию памяти в байтах.
    */
   void SetMemoryLimit(size_t limit_size);
+  /**
+   * \brief Установить максимальное количество элементов, обрабатываемых одним потоком.
+   */
+  void SetMaxValueCountPerThread(size_t value_count);
 };
 
 template <typename Duration>
@@ -75,6 +79,10 @@ inline void FakeConfiguration::SetZeroDurations() {
 
 inline void FakeConfiguration::SetMemoryLimit(const size_t limit_size) {
   params[TapeSorter<FileTape<>::ValueT>::kMemoryLimitKey] = limit_size;
+}
+
+inline void FakeConfiguration::SetMaxValueCountPerThread(const size_t value_count) {
+  params[TapeSorter<FileTape<>::ValueT>::kMaxValueCountPerThreadKey] = value_count;
 }
 
 }  // namespace sot::test

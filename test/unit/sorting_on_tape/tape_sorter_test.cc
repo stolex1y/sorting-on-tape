@@ -9,7 +9,7 @@
 
 namespace sot::test {
 
-using Value = std::int64_t;
+using Value = char;
 
 class TapeSorterTest : public TapeSorterTestBase<Value>, public testing::Test {
  public:
@@ -22,10 +22,19 @@ TapeSorterTest::TapeSorterTest() {
   );
 }
 
-TEST_F(TapeSorterTest, SortRandomArrayWithoutMemoryLimit) {
+TEST_F(TapeSorterTest, SortRandomArrayAscWithoutMemoryLimit) {
   const auto expected_values = InitInputDataWithRandomValues(100000);
 
   const auto actual_values = SortTape();
+
+  VerifyContentEquals(expected_values, actual_values);
+}
+
+TEST_F(TapeSorterTest, SortRandomArrayDescWithoutMemoryLimit) {
+  using Comparator = std::greater<Value>;
+  const auto expected_values = InitInputDataWithRandomValues<Comparator>(100000);
+
+  const auto actual_values = SortTape<Comparator>();
 
   VerifyContentEquals(expected_values, actual_values);
 }

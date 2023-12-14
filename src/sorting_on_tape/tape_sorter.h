@@ -9,7 +9,6 @@
 #include "configuration.h"
 #include "core/concurrent_queue.h"
 #include "core/thread_pool.h"
-#include "file_tape.h"
 #include "memory_literals.h"
 #include "tape.h"
 #include "temp_tape_provider.h"
@@ -22,12 +21,13 @@ using namespace memory_literals;
  * \brief Класс, реализующий сортировку данных с входной ленты на выходную.
  * \tparam Value тип элементов ленты.
  * \tparam ThreadPool пул потоков, задействованных при выполнении сортировки.
+ * \tparam Comparator компаратор, по умолчанию используется std::less<Value>.
  */
-template <typename Value, typename ThreadPool = core::ThreadPool>
+template <
+    typename Value,
+    typename Comparator = std::less<Value>,
+    typename ThreadPool = core::ThreadPool>
 class TapeSorter {
-  // using Value = int32_t;
-  // using ThreadPool = core::ThreadPool;
-
  public:
   /// Ключ в конфигурации, задающий лимит использования занимаемой памяти при сортировке в байтах.
   static constexpr auto kMemoryLimitKey = "memory_limit";
@@ -42,7 +42,11 @@ class TapeSorter {
   /// Максимальное количество элементов, которое может обрабатывать один поток.
   static constexpr size_t kDefaultMaxValueCountPerThread = 1000000;
 
-  TapeSorter(const Configuration &config, std::shared_ptr<TempTapeProvider<Value>> tape_provider);
+  TapeSorter(
+      const Configuration &config,
+      std::shared_ptr<TempTapeProvider<Value>> tape_provider,
+      Comparator comparator = Comparator()
+  );
 
   /**
    * \brief Выполнить сортировку данных с входной ленты.
@@ -78,6 +82,7 @@ class TapeSorter {
   size_t values_per_thread_;
   /// Провайдер временных лент для хранения промежуточных данных.
   const std::shared_ptr<TempTapeProvider<Value>> tape_provider_;
+  Comparator comparator_;
 
   /**
    * \brief Выполнить сортировку и запись блока на временную ленту.
@@ -111,22 +116,24 @@ class TapeSorter {
   void WriteLeftPart(Tape<Value> &src, size_t block_size, Tape<Value> &target) const;
 };
 
-template <typename Value, typename ThreadPool>
-const size_t TapeSorter<Value, ThreadPool>::kDefaultMaxThreadCount =
+template <typename Value, typename Comparator, typename ThreadPool>
+const size_t TapeSorter<Value, Comparator, ThreadPool>::kDefaultMaxThreadCount =
     std::thread::hardware_concurrency();
-// 1;
 
-template <typename Value, typename ThreadPool>
-TapeSorter<Value, ThreadPool>::TapeSorter(
-    const Configuration &config, std::shared_ptr<TempTapeProvider<Value>> tape_provider
+template <typename Value, typename Comparator, typename ThreadPool>
+TapeSorter<Value, Comparator, ThreadPool>::TapeSorter(
+    const Configuration &config,
+    std::shared_ptr<TempTapeProvider<Value>> tape_provider,
+    Comparator comparator
 )
     : values_in_memory_limit_(
           config.GetProperty(kMemoryLimitKey, kDefaultMemoryLimit) / sizeof(Value)
       ),
-      tape_provider_(std::move(tape_provider)) {
+      tape_provider_(std::move(tape_provider)),
+      comparator_(comparator) {
   if (values_in_memory_limit_ < 4) {
     throw std::invalid_argument(
-        std::format("Increase memory limit! Minimum - {} bytes", sizeof(Value) * 4)
+        std::format("Increase memory limit! Minimum - {} bytes.", sizeof(Value) * 4)
     );
   }
 
@@ -138,8 +145,10 @@ TapeSorter<Value, ThreadPool>::TapeSorter(
   thread_count_ = std::min(max_thread_count, values_in_memory_limit_ / values_per_thread_);
 }
 
-template <typename Value, typename ThreadPool>
-void TapeSorter<Value, ThreadPool>::Sort(Tape<Value> &input_tape, Tape<Value> &output_tape) const {
+template <typename Value, typename Comparator, typename ThreadPool>
+void TapeSorter<Value, Comparator, ThreadPool>::Sort(
+    Tape<Value> &input_tape, Tape<Value> &output_tape
+) const {
   ParallelSortContext context(*this);
   // прочитать входные данные поблочно, ввиду ограничения использования памяти
   auto temp_tape_values = input_tape.ReadN(values_per_thread_);  // элементы очередного блока
@@ -177,24 +186,26 @@ void TapeSorter<Value, ThreadPool>::Sort(Tape<Value> &input_tape, Tape<Value> &o
   }
 }
 
-template <typename Value, typename ThreadPool>
-TapeSorter<Value, ThreadPool>::ParallelSortContext::ParallelSortContext(const TapeSorter &sorter)
+template <typename Value, typename Comparator, typename ThreadPool>
+TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::ParallelSortContext(
+    const TapeSorter &sorter
+)
     : thread_pool(sorter.thread_count_), free_threads(sorter.thread_count_) {
 }
 
-template <typename Value, typename ThreadPool>
-void TapeSorter<Value, ThreadPool>::SortAndWriteBlock(
+template <typename Value, typename Comparator, typename ThreadPool>
+void TapeSorter<Value, Comparator, ThreadPool>::SortAndWriteBlock(
     ParallelSortContext &context, std::vector<Value> &&block_values
 ) const {
   TapeUniquePtr tape = tape_provider_->Get();  // временное устройство для хранения очередного блока
-  std::ranges::sort(block_values);
+  std::sort(block_values.begin(), block_values.end(), comparator_);
   tape->WriteN(block_values);
   tape->MoveToBegin();
   context.sorted_blocks.Push(std::move(tape));
 }
 
-template <typename Value, typename ThreadPool>
-void TapeSorter<Value, ThreadPool>::MergeTwoTapes(
+template <typename Value, typename Comparator, typename ThreadPool>
+void TapeSorter<Value, Comparator, ThreadPool>::MergeTwoTapes(
     ParallelSortContext &context, const TapeSharedPtr &first_tape, const TapeSharedPtr &second_tape
 ) const {
   auto merged_tape = tape_provider_->Get();  // устройство для объединенных данных
@@ -247,8 +258,8 @@ void TapeSorter<Value, ThreadPool>::MergeTwoTapes(
   context.sorted_blocks.Push(std::move(merged_tape));
 }
 
-template <typename Value, typename ThreadPool>
-void TapeSorter<Value, ThreadPool>::WriteLeftPart(
+template <typename Value, typename Comparator, typename ThreadPool>
+void TapeSorter<Value, Comparator, ThreadPool>::WriteLeftPart(
     Tape<Value> &src, const size_t block_size, Tape<Value> &target
 ) const {
   auto values = src.ReadN(block_size);

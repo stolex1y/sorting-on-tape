@@ -28,16 +28,21 @@ class TapeSorterTestBase : public TestBase {
 
   void SetUp(const std::string& test_suit_name, const std::string& test_name) override;
   /**
-   * \brief Создать SorterTape и выполнить сортировку.
+   * \brief Создать SorterTape и выполнить сортировку с использованием переданного компаратора.
+   *
+   * \tparam Comparator компаратор, по умолчанию используется std::less<Value>.
    */
+  template <typename Comparator = std::less<Value>>
   [[nodiscard]] std::vector<Value> SortTape() const;
   /**
    * \brief Создать файл, заполненный случайными значениями.
    *
    * Файл создатся по пути @link input_file_path_ @endlink.
    *
-   * \return сгенерированный массив.
+   * \tparam Comparator компаратор, по умолчанию используется std::less<Value>.
+   * \return сгенерированный массив, отсортированный с использованием переданного компаратора.
    */
+  template <typename Comparator = std::less<Value>>
   [[nodiscard]] std::vector<Value> InitInputDataWithRandomValues(size_t values_count) const;
 };
 
@@ -52,21 +57,23 @@ void TapeSorterTestBase<Value>::SetUp(
 }
 
 template <typename Value>
+template <typename Comparator>
 std::vector<Value> TapeSorterTestBase<Value>::SortTape() const {
   FileTape<Value, false> input_tape(config_, input_file_path_);
   FileTape<Value> output_tape(config_, output_file_path_);
-  const TapeSorter sorter(config_, tape_provider_);
+  const TapeSorter<Value, Comparator> sorter(config_, tape_provider_);
   sorter.Sort(input_tape, output_tape);
   return ReadAllFromTape(output_tape);
 }
 
 template <typename Value>
+template <typename Comparator>
 std::vector<Value> TapeSorterTestBase<Value>::InitInputDataWithRandomValues(
     const size_t values_count
 ) const {
   auto expected_values = GenerateRandomArray<Value>(values_count);
   CreateFileWithBinaryContent(input_file_path_, expected_values);
-  std::ranges::sort(expected_values);
+  std::ranges::sort(expected_values, Comparator());
   return expected_values;
 }
 

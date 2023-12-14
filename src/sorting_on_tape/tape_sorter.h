@@ -7,6 +7,7 @@
 #include <semaphore>
 
 #include "configuration.h"
+#include "core/concurrent_queue.h"
 #include "core/thread_pool.h"
 #include "file_tape.h"
 #include "memory_literals.h"

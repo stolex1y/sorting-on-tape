@@ -100,7 +100,7 @@ FileTape<Value, Mutable>::FileTape(const Configuration &config, const std::strin
   }
   fstream_ = std::fstream(file_name, mode);
   if (!fstream_) {
-    throw std::invalid_argument("Couldn't open the file with name '" + file_name + "'");
+    throw std::invalid_argument("Couldn't open the file with name '" + file_name + "'.");
   }
 }
 

@@ -4,11 +4,14 @@
 #include <algorithm>
 #include <execution>
 #include <format>
+#include <queue>
 
 #include "configuration.h"
 #include "core/thread_pool.h"
 #include "memory_literals.h"
 #include "tape.h"
+#include "tape_block_reader.h"
+#include "tape_block_writer.h"
 #include "temp_tape_provider.h"
 
 namespace sot {
@@ -42,7 +45,7 @@ class TapeSorter {
   /// Максимальное количество элементов, которое может обрабатывать один поток.
   static constexpr size_t kDefaultMaxValueCountPerThread = 1000000;
   /// Максимальное количество блоков, сливаемых одновременно.
-  static constexpr size_t kDefaultMaxBlocksToMerge = 2;
+  static constexpr size_t kDefaultMaxBlocksToMerge = 1000;
 
   TapeSorter(
       const Configuration &config,
@@ -67,10 +70,14 @@ class TapeSorter {
   class ParallelSortContext {
    public:
     ThreadPool thread_pool;
-    /// Количество оставшихся блоков
+    /// Количество оставшихся блоков.
     std::atomic_size_t total_block_count;
+    /// Количество значений, которые может обрабатывать один поток.
+    std::atomic_size_t values_per_thread;
 
-    ParallelSortContext(const TapeSorter &sorter, size_t blocks_to_merge_count);
+    ParallelSortContext(
+        const TapeSorter &sorter, std::size_t values_per_thread, size_t blocks_to_merge_count
+    );
 
     /**
      * \brief Добавить отсортированный блок.
@@ -127,19 +134,14 @@ class TapeSorter {
    */
   void SortAndWriteBlock(ParallelSortContext &context, std::vector<Value> &&block_values) const;
   /**
-   * \brief Выполнить слияние двух отсортированных частей массива, записанных на ленты.
+   * \brief Выполнить слияние нескольких отсортированных частей массива, записанных на ленты.
    *
-   * Результат слияния двух частей сохраняется в переданном контексте.
+   * Результат слияния сохраняется в переданном контексте.
    *
    * \param context контекст выполнения сортировки;
-   * \param first_tape первая часть массива, записанная на ленту;
-   * \param second_tape вторая часть массива, записанная на ленту;
+   * \param tapes сливаемые части массива.
    */
-  void MergeTwoTapes(
-      ParallelSortContext &context,
-      const TapeSharedPtr &first_tape,
-      const TapeSharedPtr &second_tape
-  ) const;
+  void MergeTapes(ParallelSortContext &context, const std::vector<TapeSharedPtr> &tapes) const;
   /**
    * \brief Записать оставшиеся элементы с одного устройства на другое.
    * \param[in] src источник элементов;
@@ -175,6 +177,15 @@ TapeSorter<Value, Comparator, ThreadPool>::TapeSorter(
       config.GetProperty(kMaxValueCountPerThreadKey, kDefaultMaxValueCountPerThread);
   values_per_thread_ = std::min(max_value_count_per_thread, values_in_memory_limit_);
 
+  if (values_per_thread_ / (block_to_merge_count_ + 1) < 1) {
+    throw std::invalid_argument(std::format(
+        "Can't merge {} blocks in thread! Increase memory limit or max value count per thread - "
+        "need minimum {} bytes.",
+        block_to_merge_count_,
+        (block_to_merge_count_ + 1) * sizeof(Value)
+    ));
+  }
+
   const auto max_thread_count = config.GetProperty(kMaxThreadCountKey, kDefaultMaxThreadCount);
   thread_count_ = std::min(max_thread_count, values_in_memory_limit_ / values_per_thread_);
 }
@@ -183,27 +194,26 @@ template <typename Value, typename Comparator, typename ThreadPool>
 void TapeSorter<Value, Comparator, ThreadPool>::Sort(
     Tape<Value> &input_tape, Tape<Value> &output_tape
 ) const {
-  ParallelSortContext context(*this, block_to_merge_count_);
+  ParallelSortContext context(*this, values_per_thread_, block_to_merge_count_);
   // прочитать входные данные поблочно, ввиду ограничения использования памяти
-  auto temp_tape_values = input_tape.ReadN(values_per_thread_);  // элементы очередного блока
+  auto temp_tape_values = input_tape.ReadN(context.values_per_thread);  // элементы очередного блока
   while (!temp_tape_values.empty()) {
     ++context.total_block_count;
     context.thread_pool.PostTask([this, block_values = std::move(temp_tape_values), &context](
                                  ) mutable {
       SortAndWriteBlock(context, std::move(block_values));
     });
-    temp_tape_values = input_tape.ReadN(values_per_thread_);  // прочитать следующий блок данных
+    temp_tape_values =
+        input_tape.ReadN(context.values_per_thread);  // прочитать следующий блок данных
   }
   // выполнить попарное слияние блоков данных, пока не останется 1 блок
   while (context.total_block_count > 1) {
     std::vector<TapeSharedPtr> blocks_to_merge = context.PopBlocksToMerge();
-    context.thread_pool.PostTask([this,
-                                  first_tape = blocks_to_merge[0],
-                                  second_tape = blocks_to_merge[1],
-                                  &context]() mutable {
-      MergeTwoTapes(context, first_tape, second_tape);
+    const size_t merged = blocks_to_merge.size();
+    context.thread_pool.PostTask([this, tapes = std::move(blocks_to_merge), &context]() mutable {
+      MergeTapes(context, tapes);
     });
-    context.total_block_count.fetch_sub(blocks_to_merge.size() - 1);
+    context.total_block_count.fetch_sub(merged - 1);
   }
   if (context.total_block_count > 0) {
     const auto sorted = context.Pop();
@@ -214,9 +224,11 @@ void TapeSorter<Value, Comparator, ThreadPool>::Sort(
 
 template <typename Value, typename Comparator, typename ThreadPool>
 TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::ParallelSortContext(
-    const TapeSorter &sorter, const size_t blocks_to_merge_count
+    const TapeSorter &sorter, const size_t values_per_thread, const size_t blocks_to_merge_count
 )
-    : thread_pool(sorter.thread_count_), block_to_merge_count_(blocks_to_merge_count) {
+    : thread_pool(sorter.thread_count_),
+      values_per_thread(values_per_thread),
+      block_to_merge_count_(blocks_to_merge_count) {
 }
 
 template <typename Value, typename Comparator, typename ThreadPool>
@@ -284,55 +296,38 @@ void TapeSorter<Value, Comparator, ThreadPool>::SortAndWriteBlock(
 }
 
 template <typename Value, typename Comparator, typename ThreadPool>
-void TapeSorter<Value, Comparator, ThreadPool>::MergeTwoTapes(
-    ParallelSortContext &context, const TapeSharedPtr &first_tape, const TapeSharedPtr &second_tape
+void TapeSorter<Value, Comparator, ThreadPool>::MergeTapes(
+    ParallelSortContext &context, const std::vector<TapeSharedPtr> &tapes
 ) const {
-  auto merged_tape = tape_provider_->Get();  // устройство для объединенных данных
+  using BlockReader = TapeBlockReader<Value>;
+  using BlockWriter = TapeBlockWriter<Value>;
+
   // слияние будет выполняться по частям указанного размера
-  const auto part_size = values_per_thread_ / 4;
+  const auto block_size = context.values_per_thread / (tapes.size() + 1);
 
-  std::vector<Value> first_part = first_tape->ReadN(part_size);
-  std::vector<Value> second_part = second_tape->ReadN(part_size);
-  std::vector<Value> merged_values;
-  merged_values.reserve(first_part.size() + second_part.size());
+  // устройство для объединенных данных
+  TapeSharedPtr merged_tape = tape_provider_->Get();
+  BlockWriter merged_block(block_size, merged_tape);
 
-  size_t first_i = 0, second_i = 0;
-  while (first_i < first_part.size() && second_i < second_part.size()) {
-    if (comparator_(first_part[first_i], second_part[second_i])) {
-      merged_values.emplace_back(first_part[first_i]);
-      ++first_i;
-    } else {
-      merged_values.emplace_back(second_part[second_i]);
-      ++second_i;
-    }
-    if (first_i == first_part.size()) {
-      // прочитать новую порцию данных из первого устройства
-      first_part = first_tape->ReadN(part_size);
-      first_i = 0;
-    } else if (second_i == second_part.size()) {
-      // прочитать новую порцию данных из второго устройства
-      second_part = second_tape->ReadN(part_size);
-      second_i = 0;
-    }
-    if (merged_values.size() == part_size * 2) {
-      merged_tape->WriteN(merged_values);
-      merged_values.clear();
+  const auto block_comparator = [this](const BlockReader &f, const BlockReader &s) {
+    return f.Read() != s.Read() && !comparator_(f.Read(), s.Read());
+  };
+  std::priority_queue<BlockReader, std::vector<BlockReader>, decltype(block_comparator)> blocks(
+      block_comparator
+  );
+
+  for (const auto &tape : tapes) {
+    blocks.emplace(block_size, tape);
+  }
+  while (!blocks.empty()) {
+    BlockReader block = std::move(const_cast<BlockReader &>(blocks.top()));
+    blocks.pop();
+    merged_block.Write(block.Read());
+    if (block.MoveForward()) {
+      blocks.emplace(std::move(block));
     }
   }
-  merged_tape->WriteN(merged_values);
-  merged_values.clear();
-
-  if (!first_part.empty()) {
-    // записать оставшуюся часть из первого устройства
-    merged_tape->WriteN(first_part.begin() + first_i, first_part.end());
-    first_part.clear();
-    WriteLeftPart(*first_tape, values_per_thread_, *merged_tape);
-  } else {
-    // записать оставшуюся часть из второго устройства
-    merged_tape->WriteN(second_part.begin() + second_i, second_part.end());
-    second_part.clear();
-    WriteLeftPart(*second_tape, values_per_thread_, *merged_tape);
-  }
+  merged_block.Flush();
   merged_tape->MoveToBegin();
   context.Push(std::move(merged_tape));
 }

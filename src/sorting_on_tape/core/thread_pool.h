@@ -31,6 +31,7 @@ class ThreadPool {
   std::size_t thread_count_ = 0;
   mutable std::mutex mutex_;
   const std::size_t max_thread_count_;
+  std::condition_variable has_work_;
 
   void AddThread();
   void ThreadWorker();

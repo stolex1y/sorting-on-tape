@@ -104,7 +104,7 @@ BENCHMARK_DEFINE_F(TapeSorterBenchmark, WithDifferentDelays)(State &state) {
 }
 BENCHMARK_REGISTER_F(TapeSorterBenchmark, WithDifferentDelays)
     ->ArgNames({"delay_multiplier", "threads"})
-    ->ArgsProduct({{10}, {1, 8}});
+    ->ArgsProduct({{1, 2, 10}, {1, 2, 8}});
 
 BENCHMARK_MAIN();
 

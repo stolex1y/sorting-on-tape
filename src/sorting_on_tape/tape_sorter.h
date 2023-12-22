@@ -37,7 +37,7 @@ class TapeSorter {
   /// Ключ в конфигурации, задающий максимальное количество обрабатываемых значений одним потоком.
   static constexpr auto kMaxValueCountPerThreadKey = "max_value_count_per_thread";
   /// Ключ в конфигурации, задающий максимальное количество блоков, сливаемых одновременно.
-  static constexpr auto kMaxBlockToMergeKey = "max_block_to_merge_count";
+  static constexpr auto kMaxMerginGroupSizeKey = "max_merging_group_size";
   /// Значение лимита использования занимаемой памяти при сортировке по умолчанию.
   static constexpr size_t kDefaultMemoryLimit = 1_GiB;
   /// Значение количества потоков, используемых при сортировке, по умолчанию hardware_concurrency.
@@ -45,7 +45,7 @@ class TapeSorter {
   /// Максимальное количество элементов, которое может обрабатывать один поток.
   static constexpr size_t kDefaultMaxValueCountPerThread = 1000000;
   /// Максимальное количество блоков, сливаемых одновременно.
-  static constexpr size_t kDefaultMaxBlocksToMerge = 1000;
+  static constexpr size_t kDefaultMaxMergingGroupSize = 50;
 
   TapeSorter(
       const Configuration &config,
@@ -70,14 +70,12 @@ class TapeSorter {
   class ParallelSortContext {
    public:
     ThreadPool thread_pool;
-    /// Количество оставшихся блоков.
-    std::atomic_size_t total_block_count;
+    /// Количество оставшихся блоков, после завершения запущенных слияний.
+    std::atomic_size_t block_count;
     /// Количество значений, которые может обрабатывать один поток.
     std::atomic_size_t values_per_thread;
 
-    ParallelSortContext(
-        const TapeSorter &sorter, std::size_t values_per_thread, size_t blocks_to_merge_count
-    );
+    explicit ParallelSortContext(const TapeSorter &sorter);
 
     /**
      * \brief Добавить отсортированный блок.
@@ -94,7 +92,7 @@ class TapeSorter {
     [[nodiscard]] bool Empty() const;
 
    private:
-    const size_t block_to_merge_count_;
+    const size_t merging_group_size_;
     /// Разделенные и отсортированные блоки данных.
     std::queue<TapeSharedPtr> queue_;
     std::condition_variable has_blocks_to_merge_;
@@ -122,7 +120,7 @@ class TapeSorter {
   const std::shared_ptr<TempTapeProvider<Value>> tape_provider_;
   Comparator comparator_;
   /// Максимальное количество блоков, сливаемых одновременно.
-  const size_t block_to_merge_count_;
+  const size_t merging_group_size_;
 
   /**
    * \brief Выполнить сортировку и запись блока на временную ленту.
@@ -166,7 +164,7 @@ TapeSorter<Value, Comparator, ThreadPool>::TapeSorter(
       ),
       tape_provider_(std::move(tape_provider)),
       comparator_(comparator),
-      block_to_merge_count_(config.GetProperty(kMaxBlockToMergeKey, kDefaultMaxBlocksToMerge)) {
+      merging_group_size_(config.GetProperty(kMaxMerginGroupSizeKey, kDefaultMaxMergingGroupSize)) {
   if (values_in_memory_limit_ < 4) {
     throw std::invalid_argument(
         std::format("Increase memory limit! Minimum - {} bytes.", sizeof(Value) * 4)
@@ -177,12 +175,12 @@ TapeSorter<Value, Comparator, ThreadPool>::TapeSorter(
       config.GetProperty(kMaxValueCountPerThreadKey, kDefaultMaxValueCountPerThread);
   values_per_thread_ = std::min(max_value_count_per_thread, values_in_memory_limit_);
 
-  if (values_per_thread_ / (block_to_merge_count_ + 1) < 1) {
+  if (values_per_thread_ / (merging_group_size_ + 1) < 1) {
     throw std::invalid_argument(std::format(
         "Can't merge {} blocks in thread! Increase memory limit or max value count per thread - "
         "need minimum {} bytes.",
-        block_to_merge_count_,
-        (block_to_merge_count_ + 1) * sizeof(Value)
+        merging_group_size_,
+        (merging_group_size_ + 1) * sizeof(Value)
     ));
   }
 
@@ -194,11 +192,11 @@ template <typename Value, typename Comparator, typename ThreadPool>
 void TapeSorter<Value, Comparator, ThreadPool>::Sort(
     Tape<Value> &input_tape, Tape<Value> &output_tape
 ) const {
-  ParallelSortContext context(*this, values_per_thread_, block_to_merge_count_);
+  ParallelSortContext context(*this);
   // прочитать входные данные поблочно, ввиду ограничения использования памяти
   auto temp_tape_values = input_tape.ReadN(context.values_per_thread);  // элементы очередного блока
   while (!temp_tape_values.empty()) {
-    ++context.total_block_count;
+    ++context.block_count;
     context.thread_pool.PostTask([this, block_values = std::move(temp_tape_values), &context](
                                  ) mutable {
       SortAndWriteBlock(context, std::move(block_values));
@@ -207,15 +205,15 @@ void TapeSorter<Value, Comparator, ThreadPool>::Sort(
         input_tape.ReadN(context.values_per_thread);  // прочитать следующий блок данных
   }
   // выполнить попарное слияние блоков данных, пока не останется 1 блок
-  while (context.total_block_count > 1) {
+  while (context.block_count > 1) {
     std::vector<TapeSharedPtr> blocks_to_merge = context.PopBlocksToMerge();
     const size_t merged = blocks_to_merge.size();
     context.thread_pool.PostTask([this, tapes = std::move(blocks_to_merge), &context]() mutable {
       MergeTapes(context, tapes);
     });
-    context.total_block_count.fetch_sub(merged - 1);
+    context.block_count.fetch_sub(merged - 1);
   }
-  if (context.total_block_count > 0) {
+  if (context.block_count > 0) {
     const auto sorted = context.Pop();
     WriteLeftPart(*sorted, values_in_memory_limit_, output_tape);
     output_tape.MoveToBegin();
@@ -224,11 +222,11 @@ void TapeSorter<Value, Comparator, ThreadPool>::Sort(
 
 template <typename Value, typename Comparator, typename ThreadPool>
 TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::ParallelSortContext(
-    const TapeSorter &sorter, const size_t values_per_thread, const size_t blocks_to_merge_count
+    const TapeSorter &sorter
 )
     : thread_pool(sorter.thread_count_),
-      values_per_thread(values_per_thread),
-      block_to_merge_count_(blocks_to_merge_count) {
+      values_per_thread(sorter.values_per_thread_),
+      merging_group_size_(sorter.merging_group_size_) {
 }
 
 template <typename Value, typename Comparator, typename ThreadPool>
@@ -258,7 +256,7 @@ TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::PopBlocksToMerge
   has_blocks_to_merge_.wait(lock, [this] {
     return HasBlocksToMerge();
   });
-  std::vector<TapeSharedPtr> tapes(std::min(block_to_merge_count_, total_block_count.load()));
+  std::vector<TapeSharedPtr> tapes(std::min(merging_group_size_, block_count.load()));
   for (size_t i = 0; i < tapes.size(); ++i) {
     tapes[i] = Pop_();
   }
@@ -273,7 +271,7 @@ bool TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::Empty() con
 
 template <typename Value, typename Comparator, typename ThreadPool>
 bool TapeSorter<Value, Comparator, ThreadPool>::ParallelSortContext::HasBlocksToMerge() const {
-  return queue_.size() >= std::min(total_block_count.load(), block_to_merge_count_);
+  return queue_.size() >= std::min(block_count.load(), merging_group_size_);
 }
 
 template <typename Value, typename Comparator, typename ThreadPool>

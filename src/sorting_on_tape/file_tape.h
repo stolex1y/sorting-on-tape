@@ -44,6 +44,10 @@ class FileTape : public Tape<Value> {
   /// Ключ в конфигурации,
   /// задающий задержку сдвига ленты на одну позицию в @link Duration заданных единицах@endlink.
   static constexpr auto kRewindDurationKey = "rewind_duration";
+  /// Ключ в конфигурации,
+  /// задающий задержку преодоления межблочного промежутка ленты в @link Duration заданных
+  /// единицах@endlink.
+  static constexpr auto kGapCrossDurationKey = "gap_cross_duration";
 
   /// Значение задержки чтения по умолчанию в @link Duration заданных единицах@endlink.
   static constexpr auto kReadDurationDefault = 7;
@@ -52,7 +56,10 @@ class FileTape : public Tape<Value> {
   /// Значение задержки перемотки по умолчанию в @link Duration заданных единицах@endlink.
   static constexpr auto kMoveDurationDefault = 1;
   /// Значение задержки сдвига по умолчанию в @link Duration заданных единицах@endlink.
-  static constexpr auto kRewindDurationDefault = 100;
+  static constexpr auto kRewindDurationDefault = 1000;
+  /// Значение задержки преодоления межблочного промежутка по умолчанию в @link Duration заданных
+  /// единицах@endlink.
+  static constexpr auto kGapCrossDurationDefault = 200;
 
   FileTape(const Configuration &config, const std::string &file_name);
   FileTape(FileTape &&other) = default;
@@ -76,11 +83,20 @@ class FileTape : public Tape<Value> {
   Duration write_duration_;
   Duration move_duration_;
   Duration rewind_duration_;
+  Duration gap_cross_duration_;
 
   /**
    * \brief Получить последнюю позицию в файле.
    */
   std::fstream::pos_type GetLastPos() const;
+  /**
+   * \brief Запись одного элемента, но без дополнительных задержек.
+   */
+  bool Write_(const Value &value);
+  /**
+   * \brief Чтение одного элемента, но без дополнительных задержек.
+   */
+  std::optional<Value> Read_();
 };
 
 template <typename Value, bool Mutable>
@@ -88,7 +104,8 @@ FileTape<Value, Mutable>::FileTape(const Configuration &config, const std::strin
     : read_duration_(config.GetProperty(kReadDurationKey, kReadDurationDefault)),
       write_duration_(config.GetProperty(kWriteDurationKey, kWriteDurationDefault)),
       move_duration_(config.GetProperty(kMoveDurationKey, kMoveDurationDefault)),
-      rewind_duration_(config.GetProperty(kRewindDurationKey, kRewindDurationDefault)) {
+      rewind_duration_(config.GetProperty(kRewindDurationKey, kRewindDurationDefault)),
+      gap_cross_duration_(config.GetProperty(kGapCrossDurationKey, kGapCrossDurationDefault)) {
   auto mode = std::ios_base::in | std::ios_base::binary;
   if (Mutable) {
     mode |= std::ios_base::out;
@@ -106,64 +123,56 @@ FileTape<Value, Mutable>::FileTape(const Configuration &config, const std::strin
 
 template <typename Value, bool Mutable>
 std::optional<Value> FileTape<Value, Mutable>::Read() {
-  Value value;
-  const auto before = fstream_.tellg();
-  fstream_.read(reinterpret_cast<char *>(&value), sizeof(value));
-  if (!fstream_) {
-    fstream_.clear();
-    fstream_.seekg(before);
-    return std::nullopt;
-  }
-  std::this_thread::sleep_for(read_duration_ + move_duration_);
-  return value;
+  std::this_thread::sleep_for(read_duration_ + move_duration_ + gap_cross_duration_);
+  return Read_();
 }
 
 template <typename Value, bool Mutable>
 auto FileTape<Value, Mutable>::ReadN(const size_t n) -> Values {
   std::vector<Value> values;
   for (size_t i = 0; i < n; ++i) {
-    const auto value = Read();
+    const auto value = Read_();
     if (!value) {
       break;
     }
     values.push_back(*value);
   }
+  std::this_thread::sleep_for(
+      values.size() * (read_duration_ + move_duration_) + gap_cross_duration_
+  );
   return values;
 }
 
 template <typename Value, bool Mutable>
 bool FileTape<Value, Mutable>::Write(const Value &value) {
-  const auto before = fstream_.tellg();
-  fstream_.write(reinterpret_cast<const char *>(&value), sizeof(value));
-  if (!fstream_) {
-    fstream_.clear();
-    fstream_.seekg(before);
-    return false;
-  }
-  std::this_thread::sleep_for(write_duration_ + move_duration_);
-  return true;
+  std::this_thread::sleep_for(write_duration_ + move_duration_ + gap_cross_duration_);
+  return Write_(value);
 }
 
 template <typename Value, bool Mutable>
 size_t FileTape<Value, Mutable>::WriteN(const Values &values) {
   size_t i;
   for (i = 0; i < values.size(); ++i) {
-    if (!Write(values[i])) {
+    if (!Write_(values[i])) {
       break;
     }
   }
+  std::this_thread::sleep_for(i * (write_duration_ + move_duration_) + gap_cross_duration_);
   return i;
 }
 
 template <typename Value, bool Mutable>
 auto FileTape<Value, Mutable>::WriteN(ValuesConstIterator begin, ValuesConstIterator end)
     -> ValuesConstIterator {
+  size_t written = 0;
   while (begin < end) {
-    if (!Write(*begin)) {
+    if (!Write_(*begin)) {
       break;
     }
     ++begin;
+    ++written;
   }
+  std::this_thread::sleep_for(written * (write_duration_ + move_duration_) + gap_cross_duration_);
   return begin;
 }
 
@@ -219,6 +228,31 @@ std::fstream::pos_type FileTape<Value, Mutable>::GetLastPos() const {
   const auto last_pos = fstream_.tellg();
   fstream_.seekg(prev_pos);
   return last_pos;
+}
+
+template <typename Value, bool Mutable>
+bool FileTape<Value, Mutable>::Write_(const Value &value) {
+  const auto before = fstream_.tellg();
+  fstream_.write(reinterpret_cast<const char *>(&value), sizeof(value));
+  if (!fstream_) {
+    fstream_.clear();
+    fstream_.seekg(before);
+    return false;
+  }
+  return true;
+}
+
+template <typename Value, bool Mutable>
+std::optional<Value> FileTape<Value, Mutable>::Read_() {
+  Value value;
+  const auto before = fstream_.tellg();
+  fstream_.read(reinterpret_cast<char *>(&value), sizeof(value));
+  if (!fstream_) {
+    fstream_.clear();
+    fstream_.seekg(before);
+    return std::nullopt;
+  }
+  return value;
 }
 
 }  // namespace sot

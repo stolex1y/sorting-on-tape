@@ -35,6 +35,11 @@ class FakeConfiguration : public Configuration {
   template <typename Duration>
   void SetRewindDuration(Duration duration);
   /**
+   * \brief Установить значение задержки преодоления межблочного расстояния.
+   */
+  template <typename Duration>
+  void SetGapCrossDuration(Duration duration);
+  /**
    * \brief Установить нулевое значение всех задержек.
    */
   void SetZeroDurations();
@@ -49,7 +54,11 @@ class FakeConfiguration : public Configuration {
   /**
    * \brief Установить максимальное количество блоков, сливаемых одновременно.
    */
-  void SetMaxBlockToMergeCount(size_t count);
+  void SetMaxMergingGroupSize(size_t count);
+  /**
+   * \brief Установить максимальное количество потоков.
+   */
+  void SetMaxThreadCount(size_t count);
 };
 
 template <typename Duration>
@@ -74,11 +83,18 @@ void FakeConfiguration::SetRewindDuration(Duration duration) {
       std::chrono::floor<FileTape<>::Duration>(duration).count();
 }
 
+template <typename Duration>
+void FakeConfiguration::SetGapCrossDuration(Duration duration) {
+  params[FileTape<>::kGapCrossDurationKey] =
+      std::chrono::floor<FileTape<>::Duration>(duration).count();
+}
+
 inline void FakeConfiguration::SetZeroDurations() {
   SetWriteDuration(0us);
   SetReadDuration(0us);
   SetRewindDuration(0us);
   SetMoveDuration(0us);
+  SetGapCrossDuration(0us);
 }
 
 inline void FakeConfiguration::SetMemoryLimit(const size_t limit_size) {
@@ -89,8 +105,12 @@ inline void FakeConfiguration::SetMaxValueCountPerThread(const size_t value_coun
   params[TapeSorter<FileTape<>::ValueT>::kMaxValueCountPerThreadKey] = value_count;
 }
 
-inline void FakeConfiguration::SetMaxBlockToMergeCount(const size_t count) {
-  params[TapeSorter<FileTape<>::ValueT>::kMaxBlockToMergeKey] = count;
+inline void FakeConfiguration::SetMaxMergingGroupSize(const size_t count) {
+  params[TapeSorter<FileTape<>::ValueT>::kMaxMerginGroupSizeKey] = count;
+}
+
+inline void FakeConfiguration::SetMaxThreadCount(const size_t count) {
+  params[TapeSorter<FileTape<>::ValueT>::kMaxThreadCountKey] = count;
 }
 
 }  // namespace sot::test

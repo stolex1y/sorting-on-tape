@@ -4,18 +4,22 @@
 
 namespace sot::test::benchmark {
 
+using namespace ::benchmark;
+
 using Value = std::int32_t;
 
-class TapeSorterBenchmark : public TapeSorterTestBase<Value>, public ::benchmark::Fixture {
+class TapeSorterBenchmark : public TapeSorterTestBase<Value>, public Fixture {
  public:
-  void SetUp(::benchmark::State &st) override;
-  void TearDown(::benchmark::State &st) override;
-  void SetUpTapeDurations(std::chrono::microseconds base_duration = 5us);
+  void SetUp(State &st) override;
+  void TearDown(State &st) override;
+  void SetUpTapeDurations(size_t multiplier = 1);
   void SetUpMemoryLimit(std::size_t value_count, uint64_t divider = 10);
-  void SetUpPerThreadCount(std::size_t value_count);
+  void SetUpPerThreadCount(
+      std::size_t value_count, std::size_t thread_count = std::thread::hardware_concurrency()
+  );
 };
 
-void TapeSorterBenchmark::SetUp(::benchmark::State &st) {
+void TapeSorterBenchmark::SetUp(State &st) {
   Fixture::SetUp(st);
   const auto benchmark_name = st.name();
   const auto test_suit_name = benchmark_name.substr(0, benchmark_name.find('/'));
@@ -24,97 +28,83 @@ void TapeSorterBenchmark::SetUp(::benchmark::State &st) {
   SetUpTapeDurations();
 }
 
-void TapeSorterBenchmark::TearDown(::benchmark::State &st) {
+void TapeSorterBenchmark::TearDown(State &st) {
   Fixture::TearDown(st);
 }
 
-void TapeSorterBenchmark::SetUpTapeDurations(const std::chrono::microseconds base_duration) {
-  config_.SetMoveDuration(base_duration / 5);
-  config_.SetReadDuration(base_duration);
-  config_.SetWriteDuration(base_duration);
-  config_.SetRewindDuration(base_duration * 10);
+void TapeSorterBenchmark::SetUpTapeDurations(const size_t multiplier) {
+  const auto base = 1us;
+  config_.SetMoveDuration(base * multiplier);
+  config_.SetReadDuration(base * multiplier * 5);
+  config_.SetWriteDuration(base * multiplier * 5);
+  config_.SetRewindDuration(base * multiplier * 10000);
+  config_.SetGapCrossDuration(base * multiplier * 1000);
 }
 
 void TapeSorterBenchmark::SetUpMemoryLimit(const std::size_t value_count, const uint64_t divider) {
   config_.SetMemoryLimit(value_count * sizeof(Value) / divider);
 }
 
-void TapeSorterBenchmark::SetUpPerThreadCount(const std::size_t value_count) {
-  config_.SetMaxValueCountPerThread(value_count / std::thread::hardware_concurrency());
+void TapeSorterBenchmark::SetUpPerThreadCount(
+    const std::size_t value_count, const std::size_t thread_count
+) {
+  config_.SetMaxValueCountPerThread(value_count / thread_count);
 }
 
-BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortRandomArray)(::benchmark::State &state) {
-  const auto value_count = state.range(0);
-  SetUpMemoryLimit(value_count);
-  SetUpPerThreadCount(value_count);
+BENCHMARK_DEFINE_F(TapeSorterBenchmark, WithMemoryLimit)(State &state) {
+  constexpr auto value_count = 15000;
+  const auto mem_divider = state.range(0);
+  const auto thread_count = state.range(1);
+  SetUpMemoryLimit(value_count, mem_divider);
+  config_.SetMaxThreadCount(thread_count);
+  config_.SetMaxValueCountPerThread(value_count / mem_divider / thread_count);
+  config_.SetMaxMergingGroupSize(2);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {
     const auto sorted_values = SortTape();
   }
 }
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortRandomArray)->Arg(5000)->Arg(10000)->Arg(25000);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, WithMemoryLimit)
+    ->ArgNames({"memory_divider", "threads"})
+    ->ArgsProduct({{10, 100, 500}, {1, 2, 8}});
 
-BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedArray)(::benchmark::State &state) {
-  const size_t value_count = state.range(0);
-  SetUpMemoryLimit(value_count);
-  SetUpPerThreadCount(value_count);
-  auto expected_values = GenerateRandomArray<Value>(value_count);
-  std::ranges::sort(expected_values);
-  CreateFileWithBinaryContent(input_file_path_, expected_values);
-  for (auto _ : state) {
-    const auto sorted_values = SortTape();
-  }
-}
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedArray)->Arg(5000)->Arg(10000)->Arg(25000);
-
-BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)(::benchmark::State &state) {
-  const size_t value_count = state.range(0);
-  SetUpMemoryLimit(value_count);
-  SetUpPerThreadCount(value_count);
-  auto expected_values = GenerateRandomArray<Value>(value_count);
-  std::ranges::sort(expected_values, std::greater());
-  CreateFileWithBinaryContent(input_file_path_, expected_values);
-  for (auto _ : state) {
-    const auto sorted_values = SortTape();
-  }
-}
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortSortedInReverseOrderArray)
-    ->Arg(5000)
-    ->Arg(10000)
-    ->Arg(25000);
-
-BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)(::benchmark::State &state) {
-  constexpr size_t value_count = 40000;
-  SetUpMemoryLimit(value_count, state.range(0));
-  SetUpPerThreadCount(value_count);
+BENCHMARK_DEFINE_F(TapeSorterBenchmark, WithDifferentMergeGroupSize)(State &state) {
+  constexpr auto value_count = 100000;
+  constexpr auto mem_divider = 100;
+  const auto merge_group_size = state.range(0);
+  const auto thread_count = state.range(1);
+  SetUpMemoryLimit(value_count, mem_divider);
+  config_.SetMaxThreadCount(thread_count);
+  config_.SetMaxValueCountPerThread(value_count / mem_divider / thread_count);
+  config_.SetMaxMergingGroupSize(merge_group_size);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {
     const auto sorted_values = SortTape();
   }
 }
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithMemoryLimit)
-    ->Arg(1)
-    ->Arg(5)
-    ->Arg(20)
-    ->Arg(100)
-    ->Arg(1000)
-    ->Arg(10000);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, WithDifferentMergeGroupSize)
+    ->ArgNames({"merge_group_size", "threads"})
+    ->ArgsProduct({{2, 5, 10, 15, 20}, {1, 2, 8}});
 
-BENCHMARK_DEFINE_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)(::benchmark::State &state) {
-  constexpr size_t value_count = 20000;
-  SetUpMemoryLimit(value_count);
-  SetUpPerThreadCount(value_count);
-  SetUpTapeDurations(state.range(0) * 1us);
+BENCHMARK_DEFINE_F(TapeSorterBenchmark, WithDifferentDelays)(State &state) {
+  constexpr auto value_count = 10000;
+  constexpr auto mem_divider = 50;
+  constexpr auto merge_group_size = 2;
+  const auto delay_multiplier = state.range(0);
+  const auto thread_count = state.range(1);
+  SetUpTapeDurations(delay_multiplier);
+  SetUpMemoryLimit(value_count, mem_divider);
+  config_.SetMaxThreadCount(thread_count);
+  config_.SetMaxValueCountPerThread(value_count / mem_divider / thread_count);
+  config_.SetMaxMergingGroupSize(merge_group_size);
   const auto values = InitInputDataWithRandomValues(value_count);
   for (auto _ : state) {
     const auto sorted_values = SortTape();
   }
 }
-BENCHMARK_REGISTER_F(TapeSorterBenchmark, SortArrayWithDifferentDelays)
-    ->Arg(1)
-    ->Arg(10)
-    ->Arg(20)
-    ->Arg(100);
+BENCHMARK_REGISTER_F(TapeSorterBenchmark, WithDifferentDelays)
+    ->ArgNames({"delay_multiplier", "threads"})
+    ->ArgsProduct({{10}, {1, 8}});
 
 BENCHMARK_MAIN();
 

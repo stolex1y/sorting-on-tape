@@ -21,6 +21,7 @@ TapeSorterTest::TapeSorterTest() {
       "TapeSorterTest", testing::UnitTest::GetInstance()->current_test_info()->name()
   );
   config_.SetMaxValueCountPerThread(10000);
+  config_.SetMaxBlockToMergeCount(10);
 }
 
 TEST_F(TapeSorterTest, SortRandomArrayAscWithoutMemoryLimit) {

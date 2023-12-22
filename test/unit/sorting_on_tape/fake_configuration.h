@@ -46,6 +46,10 @@ class FakeConfiguration : public Configuration {
    * \brief Установить максимальное количество элементов, обрабатываемых одним потоком.
    */
   void SetMaxValueCountPerThread(size_t value_count);
+  /**
+   * \brief Установить максимальное количество блоков, сливаемых одновременно.
+   */
+  void SetMaxBlockToMergeCount(size_t count);
 };
 
 template <typename Duration>
@@ -83,6 +87,10 @@ inline void FakeConfiguration::SetMemoryLimit(const size_t limit_size) {
 
 inline void FakeConfiguration::SetMaxValueCountPerThread(const size_t value_count) {
   params[TapeSorter<FileTape<>::ValueT>::kMaxValueCountPerThreadKey] = value_count;
+}
+
+inline void FakeConfiguration::SetMaxBlockToMergeCount(const size_t count) {
+  params[TapeSorter<FileTape<>::ValueT>::kMaxBlockToMergeKey] = count;
 }
 
 }  // namespace sot::test

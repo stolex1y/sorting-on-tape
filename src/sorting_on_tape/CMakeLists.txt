@@ -14,6 +14,8 @@ add_library(${OBJ_LIB} OBJECT
         core/thread_pool.cc
         core/thread_pool.h
         core/tasks.h
+        tape_block_reader.h
+        tape_block_writer.h
 )
 target_include_directories(${OBJ_LIB} PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
